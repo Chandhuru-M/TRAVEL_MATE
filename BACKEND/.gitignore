@@ -1,0 +1,10 @@
+# .gitignore
+
+# Dependencies
+node_modules
+
+# Environment Variables
+.env
+
+# Firebase Admin SDK credentials
+src/config/serviceAccountKey.json
