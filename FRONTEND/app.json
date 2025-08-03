@@ -22,8 +22,10 @@
       },
       "permissions": [
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.RECORD_AUDIO"
-      ]
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ],
+      "package": "com.Travel_Mate.breakers"
     },
     "plugins": [
       [
@@ -32,6 +34,11 @@
           "locationWhenInUsePermission": "Show current location on map."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "3525a799-4d03-43ec-b5d4-614c2e86d5ff"
+      }
+    }
   }
 }
