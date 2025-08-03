@@ -6,7 +6,8 @@ const cors = require('cors');
 
 // --- Import Routes ---
 const userRoutes = require('./src/api/routes/user.routes.js');
-const chatRoutes = require('./src/api/routes/chat.routes.js'); // <-- ADD THIS
+const chatRoutes = require('./src/api/routes/chat.routes.js');
+const dataRoutes = require('./src/api/routes/data.routes.js'); // <-- ADD THIS
 
 const app = express();
 
@@ -15,7 +16,8 @@ app.use(express.json());
 
 // --- Use Routes ---
 app.use('/api/user', userRoutes);
-app.use('/api/chat', chatRoutes); // <-- ADD THIS
+app.use('/api/chat', chatRoutes);
+app.use('/api/data', dataRoutes); // <-- ADD THIS
 
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to the TravelMate Backend API!' });
