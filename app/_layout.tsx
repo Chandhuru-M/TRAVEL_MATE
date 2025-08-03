@@ -1,29 +1,54 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import React, { useEffect } from 'react';
+import { SplashScreen, Stack } from 'expo-router';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+// Correctly import AuthProvider from context...
+import { AuthProvider } from '@/context/AuthContext';
+// ...and correctly import useAuth from hooks
+import { useAuth } from '@/hooks/useAuth';
 
-import { useColorScheme } from '@/hooks/useColorScheme';
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+// Prevent the splash screen from auto-hiding before asset loading is complete.
+SplashScreen.preventAutoHideAsync();
+
+function RootLayoutNav() {
+  const { isAuthenticated, isLoading } = useAuth();
+  const [fontsLoaded, fontError] = useFonts({
+    // FIX: Changed the paths to use the '@/' alias for robustness.
+    'Inter-Regular': require('@/assets/fonts/Inter-Regular.ttf'),
+    'Inter-Bold': require('@/assets/fonts/Inter-Bold.ttf'),
   });
 
-  if (!loaded) {
-    // Async font loading only occurs in development.
+  useEffect(() => {
+    // Hide the splash screen once fonts are loaded and auth state is determined.
+    if ((fontsLoaded || fontError) && !isLoading) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, fontError, isLoading]);
+
+  // If fonts are not loaded yet, or we are still checking auth, show nothing.
+  // The splash screen is still visible.
+  if (!fontsLoaded && !fontError || isLoading) {
     return null;
   }
 
+  // If everything is loaded, render the correct navigation stack.
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
+    <Stack>
+      {isAuthenticated ? (
+        // User is signed in, show the main app
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+      ) : (
+        // User is not signed in, show the auth flow
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      )}
+    </Stack>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <RootLayoutNav />
+    </AuthProvider>
   );
 }

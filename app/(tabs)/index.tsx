@@ -1,75 +1,165 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Link, useRouter } from 'expo-router';
+import React from 'react';
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+// FIX: Corrected the import path
+// import { Colors, sizes } from '@/constants';
+import { Colors, sizes } from '@/constants';
+import { useAuth } from '@/hooks/useAuth';
 
-export default function HomeScreen() {
+// --- Components (can be moved to their own files later) ---
+const QuickAction = ({ icon, label, screen }: { icon: any; label: string; screen: any }) => {
+  const router = useRouter();
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <TouchableOpacity style={styles.actionItem} onPress={() => router.push(screen)}>
+      <View style={styles.actionIconContainer}>
+        <Ionicons name={icon} size={28} color={Colors.light.primary} />
+      </View>
+      <Text style={styles.actionLabel}>{label}</Text>
+    </TouchableOpacity>
   );
-}
+};
+
+// --- Main Screen Component ---
+const HomeScreen = () => {
+  const { user } = useAuth();
+  const userName = user?.name || "Wanderer";
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContainer}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+            <View>
+            <Text style={styles.greeting}>Hello,</Text>
+            <Text style={styles.userName}>{userName}</Text>
+            </View>
+            <Image
+            source={{ uri: `https://i.pravatar.cc/150?u=${user?.email}` }}
+            style={styles.avatar}
+            />
+        </View>
+
+        {/* AI Prompt Card */}
+        <Link href="/chat" asChild>
+          <TouchableOpacity style={styles.aiCard}>
+            <Ionicons name="sparkles" size={32} color={Colors.light.accent} />
+            <View style={styles.aiCardTextContainer}>
+              <Text style={styles.aiCardTitle}>Talk to your AI Assistant</Text>
+              <Text style={styles.aiCardSubtitle}>Plan trips, find places, and more</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color={'rgba(255, 255, 255, 0.7)'} />
+          </TouchableOpacity>
+        </Link>
+
+        {/* Quick Actions */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <View style={styles.actionsGrid}>
+            <QuickAction icon="compass-outline" label="Explore" screen="/explore" />
+            <QuickAction icon="bed-outline" label="Hotels" screen="/explore" />
+            <QuickAction icon="map-outline" label="Map View" screen="/map" />
+            <QuickAction icon="wallet-outline"label="Budget" screen="/profile"/>
+          </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  safeArea: {
+    flex: 1,
+    backgroundColor: Colors.light.background,
+  },
+  scrollContainer: {
+    padding: sizes.spacing.md,
+    paddingBottom: 120,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: sizes.spacing.lg,
+  },
+  greeting: {
+    fontSize: sizes.font.md,
+    color: Colors.light.textSecondary,
+  },
+  userName: {
+    fontSize: sizes.font.xxl,
+    fontWeight: 'bold',
+    color: Colors.light.text,
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  aiCard: {
+    backgroundColor: '#4A42A3', // primaryDark
+    borderRadius: sizes.borderRadius.lg,
+    padding: sizes.spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    marginBottom: sizes.spacing.xl,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  aiCardTextContainer: {
+    flex: 1,
+    marginLeft: sizes.spacing.md,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  aiCardTitle: {
+    color: Colors.light.cardBackground,
+    fontSize: sizes.font.lg,
+    fontWeight: 'bold',
+  },
+  aiCardSubtitle: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: sizes.font.sm,
+  },
+  section: {
+    marginBottom: sizes.spacing.xl,
+  },
+  sectionTitle: {
+    fontSize: sizes.font.xl,
+    fontWeight: 'bold',
+    color: Colors.light.text,
+    marginBottom: sizes.spacing.md,
+  },
+  actionsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    flexWrap: 'wrap',
+  },
+  actionItem: {
+    alignItems: 'center',
+    width: '25%',
+    marginBottom: sizes.spacing.md,
+  },
+  actionIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: sizes.borderRadius.md,
+    backgroundColor: Colors.light.cardBackground,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: sizes.spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  actionLabel: {
+    fontSize: sizes.font.sm,
+    color: Colors.light.textSecondary,
+    textAlign: 'center',
   },
 });
+
+export default HomeScreen;
