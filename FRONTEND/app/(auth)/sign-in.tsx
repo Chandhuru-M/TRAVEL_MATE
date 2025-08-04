@@ -34,20 +34,20 @@ const SignInScreen = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleSignIn = async () => {
+  // In sign-in.tsx
+const handleSignIn = async () => {
     if (!email || !password) {
       Alert.alert('Incomplete Fields', 'Please enter both email and password.');
       return;
     }
     setLoading(true);
-    try {
-      await login(email, password);
-    } catch (error: any) {
-      Alert.alert('Sign In Failed', 'Invalid email or password. Please try again.');
-    } finally {
-      setLoading(false);
+    const { error } = await login(email, password);
+    if (error) {
+      Alert.alert('Sign In Failed', error.message);
     }
-  };
+    // On success, the onAuthStateChange listener and useProtectedRoute hook will handle navigation automatically.
+    setLoading(false);
+};
 
   return (
     <SafeAreaView style={styles.safeArea}>

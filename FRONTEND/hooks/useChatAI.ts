@@ -44,7 +44,7 @@ export const useChatAI = (initialMessages: Message[] = []): UseChatAIState => {
     // 2. Send the message to your backend API
     try {
       // IMPORTANT: Replace this URL with your actual backend endpoint
-      const response = await axios.post('https://your-backend.com/api/chat', {
+      const response = await axios.post('https://10.96.101.177/api/chat', {
         message: text,
         // You might also send conversation history for context
         // history: messages,

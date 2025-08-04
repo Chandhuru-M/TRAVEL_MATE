@@ -35,20 +35,22 @@ const SignUpScreen = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleSignUp = async () => {
+  // In sign-up.tsx
+const handleSignUp = async () => {
     if (!name || !email || !password) {
-      Alert.alert('Incomplete Fields', 'Please fill in all fields to create an account.');
+      Alert.alert('Incomplete Fields', 'Please fill in all fields.');
       return;
     }
     setLoading(true);
-    try {
-      await register(email, password, name);
-    } catch (error: any) {
-      Alert.alert('Sign Up Failed', 'Could not create account. Please try again.');
-    } finally {
-      setLoading(false);
+    const { error } = await register(email, password, name);
+    if (error) {
+      Alert.alert('Sign Up Failed', error.message);
+    } else {
+      // Supabase sends a confirmation email by default.
+      Alert.alert('Check your email!', 'Please check your email to confirm your account.');
     }
-  };
+    setLoading(false);
+};
 
   return (
     <SafeAreaView style={styles.safeArea}>

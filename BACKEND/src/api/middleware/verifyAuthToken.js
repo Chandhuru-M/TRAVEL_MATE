@@ -1,29 +1,40 @@
-// src/api/middleware/verifyAuthToken.js
-const admin = require('../../config/firebaseAdmin.config.js');
+// src/api/middleware/verifyAuthToken.js (Real Supabase Version)
+const { createClient } = require('@supabase/supabase-js');
+
+// Initialize Supabase client with service role for admin actions
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 const verifyAuthToken = async (req, res, next) => {
-  // Check if the Authorization header exists and is formatted correctly
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(403).json({ error: 'Forbidden: No token provided or invalid format.' });
+    return res.status(403).json({ error: 'Forbidden: No token provided.' });
   }
 
-  // Extract the token from the header
-  const idToken = authHeader.split('Bearer ')[1];
+  const token = authHeader.split('Bearer ')[1];
 
   try {
-    // Verify the token using the Firebase Admin SDK
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
-    
-    // Attach the user's information (like UID) to the request object
-    // so that subsequent controllers can access it
-    req.user = decodedToken;
-    
-    // If the token is valid, proceed to the next function (the controller)
-    next();
+    // Ask Supabase to verify the token
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+
+    if (error) {
+      console.error('Supabase token verification error:', error.message);
+      return res.status(403).json({ error: 'Forbidden: Invalid token.' });
+    }
+
+    if (!user) {
+      return res.status(403).json({ error: 'Forbidden: User not found.' });
+    }
+
+    // Attach the verified user object to the request
+    req.user = user;
+    next(); // Proceed to the controller
+
   } catch (error) {
-    console.error('Error while verifying Firebase ID token:', error);
-    return res.status(403).json({ error: 'Forbidden: Invalid token.' });
+    console.error('Internal error during token verification:', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
   }
 };
 
