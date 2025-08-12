@@ -1,22 +1,24 @@
-// frontend/context/AuthContext.tsx (Final Corrected Version)
+// frontend/context/AuthContext.tsx
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { useRouter, useSegments } from 'expo-router';
-import { supabase } from '@/lib/supabase';
-import { Session, User } from '@supabase/supabase-js';
+import { supabase, checkSupabaseConfig } from '@/lib/supabase';
+import { Session, User, AuthError } from '@supabase/supabase-js';
 
 export interface AuthContextType {
   user: User | null;
   session: Session | null;
   isAuthenticated: boolean;
-  login: (email: string, pass: string) => Promise<any>;
-  register: (email: string, pass: string, name: string) => Promise<any>;
+  login: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  register: (email: string, password: string, name: string) => Promise<{ error: AuthError | null }>;
   logout: () => Promise<void>;
   isLoading: boolean;
+  isConfigValid: boolean;
 }
+
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// FIX #1: The useProtectedRoute function was missing. It is now added back in.
-function useProtectedRoute(user: any) {
+// Protected route hook
+function useProtectedRoute(user: User | null) {
   const segments = useSegments();
   const router = useRouter();
 
@@ -24,8 +26,10 @@ function useProtectedRoute(user: any) {
     const inAuthGroup = segments[0] === '(auth)';
 
     if (!user && !inAuthGroup) {
+      // User is not authenticated and not in auth group, redirect to sign-in
       router.replace('/sign-in');
     } else if (user && inAuthGroup) {
+      // User is authenticated and in auth group, redirect to main app
       router.replace('/');
     }
   }, [user, segments, router]);
@@ -35,54 +39,98 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isConfigValid, setIsConfigValid] = useState(false);
+
+  // Check Supabase configuration
+  useEffect(() => {
+    const config = checkSupabaseConfig();
+    setIsConfigValid(config.isConfigured);
+    
+    if (!config.isConfigured) {
+      console.error('Supabase not configured:', config.missing);
+      setIsLoading(false);
+      return;
+    }
+  }, []);
 
   useEffect(() => {
+    if (!isConfigValid) return;
+
     const fetchSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      setUser(session?.user ?? null);
-      setIsLoading(false);
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Error fetching session:', error);
+        } else {
+          setSession(session);
+          setUser(session?.user ?? null);
+        }
+      } catch (error) {
+        console.error('Error in fetchSession:', error);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     fetchSession();
 
+    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
+      setIsLoading(false);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [isConfigValid]);
 
-  // This line will now work because the function exists.
+  // Protected route logic
   useProtectedRoute(user);
 
-  const login = async (email: string, pass: string) => {
-    console.log("AuthContext: Attempting real Supabase login...");
-    // FIX #2: Corrected the object syntax. It should be { email: email, password: pass }
-    return supabase.auth.signInWithPassword({ email: email, password: pass });
+  const login = async (email: string, password: string) => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password 
+      });
+      return { error };
+    } catch (error) {
+      console.error('Login error:', error);
+      return { error: error as AuthError };
+    }
   };
   
-  const register = async (email: string, pass: string, name: string) => {
-    console.log("AuthContext: Attempting real Supabase registration...");
-    return supabase.auth.signUp({
-      email: email,
-      // FIX #3: Corrected the object syntax. It should be { password: pass }
-      password: pass,
-      options: {
-        data: {
-          full_name: name,
-          avatar_url: `https://i.pravatar.cc/150?u=${email}`
+  const register = async (email: string, password: string, name: string) => {
+    try {
+      const response = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: name,
+            avatar_url: `https://i.pravatar.cc/150?u=${email}`
+          }
         }
-      }
-    });
+      });
+      return response; // Return full response for debugging
+    } catch (error) {
+      console.error('Registration error:', error);
+      return { error: error as AuthError, data: null };
+    }
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Logout error:', error);
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
-  const value = {
+  const value: AuthContextType = {
     user,
     session,
     isAuthenticated: !!user,
@@ -90,19 +138,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     register,
     logout,
     isLoading,
+    isConfigValid,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// ```
-
-// ### Explanation of the Fixes
-
-// 1.  **`Cannot find name 'useProtectedRoute'.ts(2304)`**: I had accidentally deleted the entire `useProtectedRoute` function in the previous version. I have now added the full function back into the file, so the line `useProtectedRoute(user);` will work correctly.
-
-// 2.  **`No value exists in scope for the shorthand property 'password'.` (in `login` function)**: This is a JavaScript syntax error. The code was `{ email, password }`. This is "shorthand" for `{ email: email, password: password }`. But the variable holding the password was named `pass`, not `password`. The corrected code is `{ email: email, password: pass }`, which explicitly assigns the value of the `pass` variable to the `password` property that Supabase expects.
-
-// 3.  **`No value exists in scope for the shorthand property 'password'.` (in `register` function)**: This was the exact same error as above, in the `signUp` call. The corrected code is now `{ password: pass }`.
-
-// My apologies for these careless errors. The corrected file above is now syntactically correct and contains all the necessary logic. After replacing the file and restarting your frontend server, these errors will be resolved.
+// Custom hook to use auth context
+export const useAuth = (): AuthContextType => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};

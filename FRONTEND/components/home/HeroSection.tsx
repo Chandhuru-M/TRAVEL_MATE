@@ -1,13 +1,46 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Colors, sizes } from '../../constants';
-import { useAuth } from '../../context/AuthContext'; // To get the user's name
+import { Colors, sizes } from '@/constants';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
 
 const HeroSection: React.FC = () => {
   const { user } = useAuth();
-  const userName = user?.name || 'Wanderer';
+  const [profile, setProfile] = useState<{ full_name?: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user?.id) {
+        console.log('No user id');
+        setLoading(false);
+        return;
+      }
+      console.log('Fetching profile for user id:', user.id);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single();
+      if (error) {
+        console.error('Error fetching profile:', error.message);
+        setProfile(null);
+      } else {
+        setProfile(data);
+        console.log('Fetched profile:', data); // Debug log
+      }
+      setLoading(false);
+    };
+    fetchProfile();
+  }, [user?.id]);
+
+  const userName = loading
+    ? ''
+    : profile?.full_name
+      ? profile.full_name
+      : '';
 
   return (
     <View style={styles.container}>
@@ -18,7 +51,7 @@ const HeroSection: React.FC = () => {
           <Text style={styles.userName}>{userName}</Text>
         </View>
         <Image
-          source={{ uri: `https://i.pravatar.cc/150?u=${user?.email}` }} // Dummy avatar
+          source={{ uri: `https://i.pravatar.cc/150?u=${user?.email}` }}
           style={styles.avatar}
         />
       </View>
@@ -26,7 +59,7 @@ const HeroSection: React.FC = () => {
       {/* AI Prompt Card */}
       <Link href="/chat" asChild>
         <TouchableOpacity style={styles.aiCard}>
-          <Ionicons name="sparkles" size={32} color={Colors.accent} />
+          <Ionicons name="sparkles" size={32} color={Colors.light.accent} />
           <View style={styles.aiCardTextContainer}>
             <Text style={styles.aiCardTitle}>Talk to your AI Assistant</Text>
             <Text style={styles.aiCardSubtitle}>Plan trips, find places, and more</Text>
@@ -50,12 +83,12 @@ const styles = StyleSheet.create({
   },
   greeting: {
     fontSize: sizes.font.md,
-    color: Colors.textSecondary,
+    color: Colors.light.textSecondary,
   },
   userName: {
     fontSize: sizes.font.xxl,
     fontWeight: 'bold',
-    color: Colors.textPrimary,
+    color: Colors.light.text,
   },
   avatar: {
     width: 50,
@@ -63,12 +96,12 @@ const styles = StyleSheet.create({
     borderRadius: 25,
   },
   aiCard: {
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: Colors.light.primary,
     borderRadius: sizes.borderRadius.lg,
     padding: sizes.spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: Colors.primaryDark,
+    shadowColor: Colors.light.primary,
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
@@ -79,7 +112,7 @@ const styles = StyleSheet.create({
     marginLeft: sizes.spacing.md,
   },
   aiCardTitle: {
-    color: Colors.white,
+    color: Colors.light.cardBackground,
     fontSize: sizes.font.lg,
     fontWeight: 'bold',
   },

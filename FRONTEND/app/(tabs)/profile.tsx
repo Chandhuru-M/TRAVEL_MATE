@@ -4,7 +4,6 @@ import React from 'react';
 import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// FIX #2: Corrected the import path to use the recommended '@/' alias.
 import { Colors, sizes } from '@/constants';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -37,10 +36,8 @@ const ProfileScreen = () => {
   const handleLogout = async () => {
     try {
       await logout();
-      // FIX #1: This line will work after restarting the dev server.
-      // The useProtectedRoute hook in AuthContext should handle this automatically,
-      // but an explicit replace is a good fallback.
-      router.replace('/sig  n-in');
+      // The useProtectedRoute hook in AuthContext should handle this automatically
+      router.replace('/sign-in');
     } catch (error) {
       Alert.alert("Logout Failed", "An error occurred while logging out.");
     }
@@ -51,12 +48,15 @@ const ProfileScreen = () => {
     return null;
   }
 
+  // Get user name from user metadata or email
+  const userName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>My Profile</Text>
 
-        <UserProfileHeader name={user.name || 'User'} email={user.email || ''} />
+        <UserProfileHeader name={userName} email={user.email || ''} />
 
         <View style={styles.optionsContainer}>
           <ProfileOption icon="person-circle-outline" label="Account Settings" onPress={() => {}} />

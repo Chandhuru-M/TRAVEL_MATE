@@ -4,8 +4,6 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// FIX: Corrected the import path to use the '@/' alias.
-// import { Colors, sizes } from '@/constants';
 import { Colors, sizes } from '@/constants';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -21,6 +19,7 @@ const AuthInput = ({ icon, placeholder, value, onChangeText, secureTextEntry, ri
       onChangeText={onChangeText}
       secureTextEntry={secureTextEntry}
       autoCapitalize="none"
+      keyboardType={placeholder.toLowerCase().includes('email') ? 'email-address' : 'default'}
     />
     {rightIcon}
   </View>
@@ -28,26 +27,38 @@ const AuthInput = ({ icon, placeholder, value, onChangeText, secureTextEntry, ri
 
 // Main Component
 const SignInScreen = () => {
-  const { login } = useAuth();
+  const { login, isLoading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // In sign-in.tsx
-const handleSignIn = async () => {
+  const handleSignIn = async () => {
     if (!email || !password) {
       Alert.alert('Incomplete Fields', 'Please enter both email and password.');
       return;
     }
-    setLoading(true);
-    const { error } = await login(email, password);
-    if (error) {
-      Alert.alert('Sign In Failed', error.message);
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      return;
     }
-    // On success, the onAuthStateChange listener and useProtectedRoute hook will handle navigation automatically.
-    setLoading(false);
-};
+
+    setLoading(true);
+    try {
+      const { error } = await login(email, password);
+      if (error) {
+        Alert.alert('Sign In Failed', error.message || 'An error occurred during sign in.');
+      }
+      // On success, the AuthContext will handle navigation automatically
+    } catch (error) {
+      Alert.alert('Sign In Failed', 'An unexpected error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -81,11 +92,11 @@ const handleSignIn = async () => {
             />
 
             <TouchableOpacity
-              style={styles.button}
+              style={[styles.button, (loading || authLoading) && styles.buttonDisabled]}
               onPress={handleSignIn}
-              disabled={loading}
+              disabled={loading || authLoading}
             >
-              {loading ? (
+              {(loading || authLoading) ? (
                 <ActivityIndicator color={Colors.light.cardBackground} />
               ) : (
                 <Text style={styles.buttonText}>Sign In</Text>
@@ -144,6 +155,8 @@ const styles = StyleSheet.create({
     borderRadius: sizes.borderRadius.md,
     paddingHorizontal: sizes.spacing.md,
     marginBottom: sizes.spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
   },
   inputIcon: {
     marginRight: sizes.spacing.sm,
@@ -161,6 +174,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: sizes.spacing.sm,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   buttonText: {
     color: Colors.light.cardBackground,

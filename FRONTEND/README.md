@@ -48,3 +48,11 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## 🚀 Hot Reload / Fast Refresh
+
+Expo supports Fast Refresh so your app updates automatically when you save changes.
+
+- Start with `npx expo start`
+- Make sure "Fast Refresh" is enabled in the Expo UI
+- If changes do not appear, press `r` in the terminal or use "Reload" in the app menu

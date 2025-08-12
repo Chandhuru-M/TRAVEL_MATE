@@ -1,11 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// FIX: Corrected the import path to use the '@/' alias.
-// import { Colors, sizes } from '@/constants';
 import { Colors, sizes } from '@/constants';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -21,6 +19,7 @@ const AuthInput = ({ icon, placeholder, value, onChangeText, secureTextEntry, ri
       onChangeText={onChangeText}
       secureTextEntry={secureTextEntry}
       autoCapitalize="none"
+      keyboardType={placeholder.toLowerCase().includes('email') ? 'email-address' : 'default'}
     />
     {rightIcon}
   </View>
@@ -28,29 +27,61 @@ const AuthInput = ({ icon, placeholder, value, onChangeText, secureTextEntry, ri
 
 // Main Component
 const SignUpScreen = () => {
-  const { register } = useAuth();
+  const { register, isLoading: authLoading } = useAuth();
+  const router = useRouter();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // In sign-up.tsx
-const handleSignUp = async () => {
+  const handleSignUp = async () => {
     if (!name || !email || !password) {
       Alert.alert('Incomplete Fields', 'Please fill in all fields.');
       return;
     }
-    setLoading(true);
-    const { error } = await register(email, password, name);
-    if (error) {
-      Alert.alert('Sign Up Failed', error.message);
-    } else {
-      // Supabase sends a confirmation email by default.
-      Alert.alert('Check your email!', 'Please check your email to confirm your account.');
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      return;
     }
-    setLoading(false);
-};
+
+    // Password validation
+    if (password.length < 6) {
+      Alert.alert('Weak Password', 'Password must be at least 6 characters long.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error, data } = await register(email, password, name);
+      console.log('Register response:', { error, data }); // Debug log
+      if (error) {
+        Alert.alert('Sign Up Failed', error.message || 'An error occurred during sign up.');
+      } else {
+        Alert.alert(
+          'Check your email!', 
+          'Please check your email to confirm your account before signing in.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                console.log('Navigating to sign-in'); // Debug log
+                router.replace('/sign-in');
+              }
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      Alert.alert('Sign Up Failed', 'An unexpected error occurred. Please try again.');
+      console.error('Sign Up Exception:', error); // Debug log
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -90,11 +121,11 @@ const handleSignUp = async () => {
             />
 
             <TouchableOpacity
-              style={styles.button}
+              style={[styles.button, (loading || authLoading) && styles.buttonDisabled]}
               onPress={handleSignUp}
-              disabled={loading}
+              disabled={loading || authLoading}
             >
-              {loading ? (
+              {(loading || authLoading) ? (
                 <ActivityIndicator color={Colors.light.cardBackground} />
               ) : (
                 <Text style={styles.buttonText}>Sign Up</Text>
@@ -116,80 +147,84 @@ const handleSignUp = async () => {
   );
 };
 
-// Styles are shared with SignInScreen
 const styles = StyleSheet.create({
-    safeArea: {
-      flex: 1,
-      backgroundColor: Colors.light.cardBackground,
-    },
-    container: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: sizes.spacing.xl,
-    },
-    logo: {
-      width: 180,
-      height: 60,
-      resizeMode: 'contain',
-      marginBottom: sizes.spacing.md,
-    },
-    title: {
-      fontSize: sizes.font.xxl,
-      fontWeight: 'bold',
-      color: Colors.light.text,
-      marginBottom: sizes.spacing.sm,
-    },
-    subtitle: {
-      fontSize: sizes.font.md,
-      color: Colors.light.textSecondary,
-      marginBottom: sizes.spacing.xl,
-    },
-    inputContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      width: '100%',
-      height: 50,
-      backgroundColor: Colors.light.background,
-      borderRadius: sizes.borderRadius.md,
-      paddingHorizontal: sizes.spacing.md,
-      marginBottom: sizes.spacing.md,
-    },
-    inputIcon: {
-      marginRight: sizes.spacing.sm,
-    },
-    input: {
-      flex: 1,
-      height: '100%',
-      color: Colors.light.text,
-    },
-    button: {
-      width: '100%',
-      height: 50,
-      backgroundColor: Colors.light.primary,
-      borderRadius: sizes.borderRadius.md,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginTop: sizes.spacing.sm,
-    },
-    buttonText: {
-      color: Colors.light.cardBackground,
-      fontSize: sizes.font.md,
-      fontWeight: 'bold',
-    },
-    footer: {
-      flexDirection: 'row',
-      marginTop: sizes.spacing.xl,
-    },
-    footerText: {
-      color: Colors.light.textSecondary,
-      fontSize: sizes.font.md,
-    },
-    linkText: {
-      color: Colors.light.primary,
-      fontSize: sizes.font.md,
-      fontWeight: 'bold',
-    },
-  });
+  safeArea: {
+    flex: 1,
+    backgroundColor: Colors.light.cardBackground,
+  },
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: sizes.spacing.xl,
+  },
+  logo: {
+    width: 180,
+    height: 60,
+    resizeMode: 'contain',
+    marginBottom: sizes.spacing.md,
+  },
+  title: {
+    fontSize: sizes.font.xxl,
+    fontWeight: 'bold',
+    color: Colors.light.text,
+    marginBottom: sizes.spacing.sm,
+  },
+  subtitle: {
+    fontSize: sizes.font.md,
+    color: Colors.light.textSecondary,
+    marginBottom: sizes.spacing.xl,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    height: 50,
+    backgroundColor: Colors.light.background,
+    borderRadius: sizes.borderRadius.md,
+    paddingHorizontal: sizes.spacing.md,
+    marginBottom: sizes.spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+  },
+  inputIcon: {
+    marginRight: sizes.spacing.sm,
+  },
+  input: {
+    flex: 1,
+    height: '100%',
+    color: Colors.light.text,
+  },
+  button: {
+    width: '100%',
+    height: 50,
+    backgroundColor: Colors.light.primary,
+    borderRadius: sizes.borderRadius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: sizes.spacing.sm,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  buttonText: {
+    color: Colors.light.cardBackground,
+    fontSize: sizes.font.md,
+    fontWeight: 'bold',
+  },
+  footer: {
+    flexDirection: 'row',
+    marginTop: sizes.spacing.xl,
+  },
+  footerText: {
+    color: Colors.light.textSecondary,
+    fontSize: sizes.font.md,
+  },
+  linkText: {
+    color: Colors.light.primary,
+    fontSize: sizes.font.md,
+    fontWeight: 'bold',
+  },
+});
 
 export default SignUpScreen;
