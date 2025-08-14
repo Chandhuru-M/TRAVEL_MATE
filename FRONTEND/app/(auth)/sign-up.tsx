@@ -56,19 +56,17 @@ const SignUpScreen = () => {
 
     setLoading(true);
     try {
-      const { error, data } = await register(email, password, name);
-      console.log('Register response:', { error, data }); // Debug log
+      const { error } = await register(email, password, name);
       if (error) {
-        Alert.alert('Sign Up Failed', error.message || 'An error occurred during sign up.');
+        Alert.alert('Sign Up Failed', error || 'An error occurred during sign up.');
       } else {
         Alert.alert(
-          'Check your email!', 
-          'Please check your email to confirm your account before signing in.',
+          'Account Created Successfully!', 
+          'Your account has been created. You can now sign in.',
           [
             {
               text: 'OK',
               onPress: () => {
-                console.log('Navigating to sign-in'); // Debug log
                 router.replace('/sign-in');
               }
             }
@@ -77,7 +75,7 @@ const SignUpScreen = () => {
       }
     } catch (error) {
       Alert.alert('Sign Up Failed', 'An unexpected error occurred. Please try again.');
-      console.error('Sign Up Exception:', error); // Debug log
+      console.error('Sign Up Exception:', error);
     } finally {
       setLoading(false);
     }

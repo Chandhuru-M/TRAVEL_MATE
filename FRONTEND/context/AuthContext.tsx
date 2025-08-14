@@ -1,24 +1,29 @@
 // frontend/context/AuthContext.tsx
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { useRouter, useSegments } from 'expo-router';
-import { supabase, checkSupabaseConfig } from '@/lib/supabase';
-import { Session, User, AuthError } from '@supabase/supabase-js';
+import { auth } from '@/firebaseconfig';
+import { 
+  User as FirebaseUser, 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged,
+  updateProfile
+} from 'firebase/auth';
 
 export interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: FirebaseUser | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<{ error: AuthError | null }>;
-  register: (email: string, password: string, name: string) => Promise<{ error: AuthError | null }>;
+  login: (email: string, password: string) => Promise<{ error: string | null }>;
+  register: (email: string, password: string, name: string) => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
   isLoading: boolean;
-  isConfigValid: boolean;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Protected route hook
-function useProtectedRoute(user: User | null) {
+function useProtectedRoute(user: FirebaseUser | null) {
   const segments = useSegments();
   const router = useRouter();
 
@@ -36,95 +41,53 @@ function useProtectedRoute(user: User | null) {
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isConfigValid, setIsConfigValid] = useState(false);
-
-  // Check Supabase configuration
-  useEffect(() => {
-    const config = checkSupabaseConfig();
-    setIsConfigValid(config.isConfigured);
-    
-    if (!config.isConfigured) {
-      console.error('Supabase not configured:', config.missing);
-      setIsLoading(false);
-      return;
-    }
-  }, []);
 
   useEffect(() => {
-    if (!isConfigValid) return;
-
-    const fetchSession = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error('Error fetching session:', error);
-        } else {
-          setSession(session);
-          setUser(session?.user ?? null);
-        }
-      } catch (error) {
-        console.error('Error in fetchSession:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchSession();
-
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
       setIsLoading(false);
     });
 
-    return () => subscription.unsubscribe();
-  }, [isConfigValid]);
+    return () => unsubscribe();
+  }, []);
 
   // Protected route logic
   useProtectedRoute(user);
 
   const login = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({ 
-        email, 
-        password 
-      });
-      return { error };
-    } catch (error) {
+      await signInWithEmailAndPassword(auth, email, password);
+      return { error: null };
+    } catch (error: any) {
       console.error('Login error:', error);
-      return { error: error as AuthError };
+      return { error: error.message || 'Login failed' };
     }
   };
   
   const register = async (email: string, password: string, name: string) => {
     try {
-      const response = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: name,
-            avatar_url: `https://i.pravatar.cc/150?u=${email}`
-          }
-        }
-      });
-      return response; // Return full response for debugging
-    } catch (error) {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // Update user profile with display name
+      if (userCredential.user) {
+        await updateProfile(userCredential.user, {
+          displayName: name
+        });
+      }
+      
+      return { error: null };
+    } catch (error: any) {
       console.error('Registration error:', error);
-      return { error: error as AuthError, data: null };
+      return { error: error.message || 'Registration failed' };
     }
   };
 
   const logout = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Logout error:', error);
-      }
+      await signOut(auth);
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -132,13 +95,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const value: AuthContextType = {
     user,
-    session,
     isAuthenticated: !!user,
     login,
     register,
     logout,
     isLoading,
-    isConfigValid,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

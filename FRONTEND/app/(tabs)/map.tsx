@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, TextInput, Button, Switch, StyleSheet, SafeAreaView, Alert } from "react-native";
+import { View, Text, TextInput, Button, Switch, StyleSheet, SafeAreaView, Alert, Platform } from "react-native";
 import { WebView } from "react-native-webview";
 import * as Location from "expo-location";
 import axios from "axios";
@@ -8,12 +8,15 @@ import { ref as dbRef, set as dbSet, onValue, remove as dbRemove } from "firebas
 
 // ---------- CONFIG ----------
 const MAPBOX_TOKEN = "pk.eyJ1Ijoic291bmRoYXJ5YSIsImEiOiJjbWU4MG0zZHcwNXJ5MmpxeGRxYW1sdWU4In0.R1lZA658526l1ZF2VxGG-w";
-const FOURSQUARE_API_KEY = "fsq3nAU59Qxza3RgOnYfbmGxnxutifJUN7jYxRDIG968erQ="; // Replace with yours
+const FOURSQUARE_API_KEY = "fsq3OadjNPEj3n5lHvJH15Ak1Q3VNhbY6SIBtYlKnmRtu+E="; // Replace with yours
 // ----------------------------
 
 // Helper: sanitize Firebase keys
-function sanitizeKey(key: string): string {
-  return key.replace(/[.#$[\]@]/g, "_");
+function sanitizePath(text: string): string {
+  return text
+    .replace(/\./g, "")
+    .replace(/@/g, "_at")
+    .replace(/[#$\[\]]/g, "_");
 }
 
 interface User {
@@ -39,6 +42,8 @@ export default function MapScreen() {
   const [uid, setUid] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentLocation, setCurrentLocation] = useState<{latitude: number, longitude: number} | null>(null);
   const webviewRef = useRef<WebView>(null);
   const watchRef = useRef<Location.LocationSubscription | null>(null);
   const usersListenerRef = useRef<(() => void) | null>(null);
@@ -67,8 +72,9 @@ export default function MapScreen() {
             zoom: 2
           });
 
-          const markers: Record<string, any> = {};
-          const placesMarkers: Record<string, any> = {};
+          const markers = {};
+          const placesMarkers = {};
+          let myMarker = null;
 
           window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
 
@@ -77,6 +83,14 @@ export default function MapScreen() {
 
             if (data.type === 'CENTER') {
               map.flyTo({ center: data.center, zoom: data.zoom });
+              if (!myMarker) {
+                myMarker = new mapboxgl.Marker({ color: 'blue' })
+                  .setLngLat(data.center)
+                  .setPopup(new mapboxgl.Popup().setText('You are here'))
+                  .addTo(map);
+              } else {
+                myMarker.setLngLat(data.center);
+              }
             }
             if (data.type === 'USERS') {
               for (const uid in markers) {
@@ -115,10 +129,10 @@ export default function MapScreen() {
   // Join a group
   const joinGroup = () => {
     if (!groupId || !name) {
-      Alert.alert("Enter group ID (email) and name");
+      Alert.alert("Enter group ID and name");
       return;
     }
-    const generatedUid = `${name.replace(/\s+/g, "_")}_${Date.now()}`;
+    const generatedUid = `${sanitizePath(name)}_${Date.now()}`;
     setUid(generatedUid);
     setJoined(true);
   };
@@ -131,15 +145,16 @@ export default function MapScreen() {
       return;
     }
     const subscription = await Location.watchPositionAsync(
-      { accuracy: Location.Accuracy.Highest, distanceInterval: 8, timeInterval: 3000 },
+      { accuracy: Location.Accuracy.Highest, distanceInterval: 5, timeInterval: 3000 },
       (pos) => {
         if (!(joined && isSharing && uid)) return;
         const { latitude, longitude } = pos.coords;
-        const safeGroupId = sanitizeKey(groupId);
+        setCurrentLocation({ latitude, longitude });
+        const safeGroupId = sanitizePath(groupId);
         const userRef = dbRef(db, `groups/${safeGroupId}/users/${uid}`);
         dbSet(userRef, { name, latitude, longitude, ts: Date.now() })
           .catch(err => console.warn("firebase write err", err));
-        sendToWebview({ type: "CENTER", center: [longitude, latitude], zoom: 13 });
+        sendToWebview({ type: "CENTER", center: [longitude, latitude], zoom: 14 });
         fetchPlaces(latitude, longitude);
       }
     );
@@ -168,7 +183,7 @@ export default function MapScreen() {
     } else {
       stopWatcher();
       if (uid) {
-        const safeGroupId = sanitizeKey(groupId);
+        const safeGroupId = sanitizePath(groupId);
         const userRef = dbRef(db, `groups/${safeGroupId}/users/${uid}`);
         dbRemove(userRef).catch(() => {});
       }
@@ -178,22 +193,22 @@ export default function MapScreen() {
   // Listen to group users
   useEffect(() => {
     if (!joined) return;
-    const safeGroupId = sanitizeKey(groupId);
+    const safeGroupId = sanitizePath(groupId);
     const usersDbRef = dbRef(db, `groups/${safeGroupId}/users`);
     const unsubscribe = onValue(usersDbRef, (snapshot) => {
       const val = snapshot.val() || {};
       const arr = Object.keys(val).map(k => ({ uid: k, ...val[k] }));
       setUsers(arr);
-      sendToWebview({ type: "USERS", users });
+      sendToWebview({ type: "USERS", users: arr });
     });
     usersListenerRef.current = unsubscribe;
-  }, [joined]);
+  }, [joined, groupId]);
 
   // Leave group
   const leaveGroup = () => {
     stopWatcher();
     if (uid) {
-      const safeGroupId = sanitizeKey(groupId);
+      const safeGroupId = sanitizePath(groupId);
       const userRef = dbRef(db, `groups/${safeGroupId}/users/${uid}`);
       dbRemove(userRef).catch(() => {});
     }
@@ -206,21 +221,23 @@ export default function MapScreen() {
     setUid(null);
   };
 
-  // Fetch nearby places from updated Foursquare API
+  // Fetch nearby places from Foursquare API using search endpoint
   const fetchPlaces = async (latitude: number, longitude: number) => {
     if (!FOURSQUARE_API_KEY) return;
     try {
-      const res = await axios.get("https://api.foursquare.com/v3/places/nearby", {
-        headers: {
-          Authorization: FOURSQUARE_API_KEY,
-          Accept: "application/json"
+      const res = await axios.get("https://api.foursquare.com/v3/places/search", {
+        headers: { 
+          "accept": "application/json",
+          "Authorization": FOURSQUARE_API_KEY 
         },
-        params: {
-          ll: `${latitude},${longitude}`,
-          radius: 2000,
-          limit: 12
+        params: { 
+          ll: `${latitude},${longitude}`, 
+          radius: 2000, 
+          limit: 12,
+          categories: "10000,13000,16000" // Food, Arts & Entertainment, Shopping
         }
       });
+      
       const items: Place[] = (res.data.results || []).map((p: any) => ({
         id: p.fsq_id,
         name: p.name,
@@ -228,14 +245,57 @@ export default function MapScreen() {
         longitude: p.geocodes?.main?.longitude,
         category: p.categories?.[0]?.name || ""
       }));
+      
       sendToWebview({ type: "PLACES", places: items });
+      console.log(`Found ${items.length} places near ${latitude}, ${longitude}`);
     } catch (err: any) {
-      console.warn("foursquare err", err?.response?.data || err.message);
+      console.warn("Foursquare API error:", err?.response?.data || err.message);
+    }
+  };
+
+  // Search places by query (e.g., "restaurant", "cafe", "park")
+  const searchPlacesByQuery = async (query: string, latitude: number, longitude: number) => {
+    if (!FOURSQUARE_API_KEY) return;
+    try {
+      const res = await axios.get("https://api.foursquare.com/v3/places/search", {
+        headers: { 
+          "accept": "application/json",
+          "Authorization": FOURSQUARE_API_KEY 
+        },
+        params: { 
+          query: query,
+          ll: `${latitude},${longitude}`, 
+          radius: 5000, 
+          limit: 20
+        }
+      });
+      
+      const items: Place[] = (res.data.results || []).map((p: any) => ({
+        id: p.fsq_id,
+        name: p.name,
+        latitude: p.geocodes?.main?.latitude,
+        longitude: p.geocodes?.main?.longitude,
+        category: p.categories?.[0]?.name || ""
+      }));
+      
+      sendToWebview({ type: "PLACES", places: items });
+      console.log(`Found ${items.length} places matching "${query}" near ${latitude}, ${longitude}`);
+      return items;
+    } catch (err: any) {
+      console.warn("Foursquare search error:", err?.response?.data || err.message);
+      return [];
     }
   };
 
   const sendToWebview = (obj: any) => {
     webviewRef.current?.postMessage(JSON.stringify(obj));
+  };
+
+  // Handle search for places
+  const handleSearch = () => {
+    if (searchQuery.trim() && currentLocation) {
+      searchPlacesByQuery(searchQuery.trim(), currentLocation.latitude, currentLocation.longitude);
+    }
   };
 
   return (
@@ -272,20 +332,38 @@ export default function MapScreen() {
             </View>
             <Button title="Leave" onPress={leaveGroup} />
           </View>
-          <WebView
-            ref={webviewRef}
-            originWhitelist={["*"]}
-            source={{ html: mapHtml }}
-            style={{ flex: 1 }}
-            onMessage={(event) => {
-              try {
-                const data = JSON.parse(event.nativeEvent.data);
-                if (data?.type === "MAP_READY") {
-                  sendToWebview({ type: "USERS", users });
-                }
-              } catch (err) {}
-            }}
-          />
+          
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <TextInput
+              placeholder="Search places (e.g., restaurant, cafe, park)"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              style={styles.searchInput}
+              onSubmitEditing={handleSearch}
+            />
+            <Button title="Search" onPress={handleSearch} />
+          </View>
+          {Platform.OS === 'web' ? (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+              <Text>Map preview is not available on web. Please use the mobile app.</Text>
+            </View>
+          ) : (
+            <WebView
+              ref={webviewRef}
+              originWhitelist={["*"]}
+              source={{ html: mapHtml }}
+              style={{ flex: 1 }}
+              onMessage={(event) => {
+                try {
+                  const data = JSON.parse(event.nativeEvent.data);
+                  if (data?.type === "MAP_READY") {
+                    sendToWebview({ type: "USERS", users });
+                  }
+                } catch (err) {}
+              }}
+            />
+          )}
         </View>
       )}
     </SafeAreaView>
@@ -321,5 +399,23 @@ const styles = StyleSheet.create({
   },
   headerText: { 
     fontWeight: "600" 
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderColor: "#eee",
+    backgroundColor: "#f9f9f9"
+  },
+  searchInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    padding: 8,
+    marginRight: 8,
+    borderRadius: 4,
+    backgroundColor: "white"
   }
 });

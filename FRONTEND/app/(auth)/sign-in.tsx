@@ -50,7 +50,7 @@ const SignInScreen = () => {
     try {
       const { error } = await login(email, password);
       if (error) {
-        Alert.alert('Sign In Failed', error.message || 'An error occurred during sign in.');
+        Alert.alert('Sign In Failed', error || 'An error occurred during sign in.');
       }
       // On success, the AuthContext will handle navigation automatically
     } catch (error) {
