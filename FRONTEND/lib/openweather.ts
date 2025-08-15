@@ -1,10 +1,9 @@
 import axios from 'axios';
+import { API_CONFIG } from '../constants/api';
 
-// IMPORTANT: Use environment variables for your API key.
-// In your .env file:
-// EXPO_PUBLIC_OPENWEATHER_API_KEY="..."
-const OPENWEATHER_API_KEY = process.env.EXPO_PUBLIC_OPENWEATHER_API_KEY;
-const API_URL = 'https://api.openweathermap.org/data/2.5/weather';
+// Use API configuration instead of environment variables
+const OPENWEATHER_API_KEY = API_CONFIG.OPENWEATHER.API_KEY;
+const API_URL = `${API_CONFIG.OPENWEATHER.BASE_URL}/weather`;
 
 // Define a clean shape for the weather data we want to use in the app
 export interface WeatherData {

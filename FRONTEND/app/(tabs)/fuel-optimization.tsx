@@ -14,11 +14,14 @@ import {
 } from 'react-native';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
-import { useInterval } from 'react-use'; // Add this package for interval logic or use setInterval manually
 
-// Use environment variables for API keys
-const FOURSQUARE_API_KEY = process.env.EXPO_PUBLIC_FOURSQUARE_API_KEY;
-const OPENWEATHER_API_KEY = process.env.EXPO_PUBLIC_OPENWEATHER_API_KEY;
+
+// Import API configuration
+import { API_CONFIG, getFoursquareHeaders } from '../../constants/api';
+
+// Use API configuration for API keys
+const FOURSQUARE_API_KEY = API_CONFIG.FOURSQUARE.API_KEY;
+const OPENWEATHER_API_KEY = API_CONFIG.OPENWEATHER.API_KEY;
 const FUEL_ALERT_THRESHOLD = 20; // Fuel % threshold for alert
 
 // Options for location watching
@@ -26,6 +29,41 @@ const WATCH_OPTIONS = { accuracy: Location.Accuracy.Highest, distanceInterval: 1
 
 // Only enable notifications and location watching on native platforms
 const isNative = Platform.OS !== 'web';
+
+// Function to get places nearby using Foursquare Places API (converted from Python)
+const getPlacesNearby = async (lat: number, lon: number, query: string, limit: number = 5, radius: number = 1000) => {
+  const url = `${API_CONFIG.FOURSQUARE.BASE_URL}/places/search`;
+  const headers = getFoursquareHeaders();
+  
+  const params = new URLSearchParams({
+    "ll": `${lat},${lon}`,
+    "query": query,
+    "limit": limit.toString(),
+    "radius": radius.toString()
+  });
+
+  // Searching for fuel stations with coordinates and parameters
+
+  try {
+    const response = await fetch(`${url}?${params}`, { headers });
+    if (response.ok) {
+      const data = await response.json();
+      const results = data.results || [];
+      
+      return results.map((place: any) => ({
+        ...place,
+        displayName: `${place.name} — ${place.location?.formatted_address || 'No address'}`
+      }));
+    } else {
+      const errorText = await response.text();
+      console.error("API Error:", response.status, response.statusText);
+      return [];
+    }
+  } catch (error) {
+    console.error("Network Error:", error);
+    return [];
+  }
+};
 
 export default function FuelStationRecommender() {
   // States
@@ -53,13 +91,28 @@ export default function FuelStationRecommender() {
   // Request location permission and get initial location
   useEffect(() => {
     (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setError('Location permission denied');
-        return;
+      try {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          setError('Location permission denied');
+          // For web testing, use default coordinates (Chennai)
+          if (Platform.OS === 'web') {
+            setLocation({ latitude: 13.0827, longitude: 80.2707 });
+            setError(null);
+          }
+          return;
+        }
+        let loc = await Location.getCurrentPositionAsync({});
+        setLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+      } catch (error) {
+        console.error('Location error:', error);
+        setError('Location error: ' + (error as Error).message);
+        // For web testing, use default coordinates
+        if (Platform.OS === 'web') {
+          setLocation({ latitude: 13.0827, longitude: 80.2707 });
+          setError(null);
+        }
       }
-      let loc = await Location.getCurrentPositionAsync({});
-      setLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
     })();
   }, []);
 
@@ -80,7 +133,10 @@ export default function FuelStationRecommender() {
     if (fuelLevel <= FUEL_ALERT_THRESHOLD && !alertSent) {
       setAlertSent(true);
       sendLowFuelAlert(fuelLevel);
-      if (location) fetchStationsWithWeather(location.latitude, location.longitude);
+      if (location) {
+        // Automatically fetch fuel stations when fuel is low
+        fetchStationsWithWeather(location.latitude, location.longitude);
+      }
     } else if (fuelLevel > FUEL_ALERT_THRESHOLD && alertSent) {
       setAlertSent(false);
       setStations([]);
@@ -126,30 +182,28 @@ export default function FuelStationRecommender() {
     });
   };
 
-  // Fetch stations + weather, score and sort
+  // Fetch stations + weather, score and sort using the converted Python logic
   const fetchStationsWithWeather = async (lat: number, lon: number) => {
     setLoading(true);
     setError(null);
 
     try {
-      // Fetch stations from Foursquare
-      const stationRes = await fetch(
-        `https://api.foursquare.com/v3/places/search?ll=${lat},${lon}&radius=5000&categories=17069&limit=10`,
-        { headers: { Authorization: FOURSQUARE_API_KEY } }
-      );
-      if (!stationRes.ok) throw new Error('Foursquare API error');
-      const stationData = await stationRes.json();
-      if (!stationData.results.length) throw new Error('No fuel stations found');
+      // Fetch stations from Foursquare using the converted Python logic
+      const stations = await getPlacesNearby(lat, lon, "fuel station", 10, 5000);
+      
+      if (!stations.length) {
+        throw new Error('No fuel stations found');
+      }
 
       // Fetch weather for each station & score
       const stationsWithScores = await Promise.all(
-        stationData.results.map(async (station: any) => {
+        stations.map(async (station: any) => {
           const sLat = station.geocodes?.main?.latitude;
           const sLon = station.geocodes?.main?.longitude;
 
           // Fetch weather
           const weatherRes = await fetch(
-            `https://api.openweathermap.org/data/2.5/weather?lat=${sLat}&lon=${sLon}&appid=${OPENWEATHER_API_KEY}&units=metric`
+            `${API_CONFIG.OPENWEATHER.BASE_URL}/weather?lat=${sLat}&lon=${sLon}&appid=${OPENWEATHER_API_KEY}&units=metric`
           );
           const weatherData = await weatherRes.json();
 
@@ -252,6 +306,11 @@ export default function FuelStationRecommender() {
       {fuelLevel <= FUEL_ALERT_THRESHOLD && (
         <View style={styles.alertBox}>
           <Text style={styles.alertText}>⚠️ Low fuel detected! Recommendations below:</Text>
+          {location && (
+            <Text style={styles.locationText}>
+              📍 Location: {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
+            </Text>
+          )}
         </View>
       )}
 
@@ -265,11 +324,11 @@ export default function FuelStationRecommender() {
 
       <FlatList
         data={stations}
-        keyExtractor={(item) => item.fsq_id}
+        keyExtractor={(item) => item.fsq_id || item.id || Math.random().toString()}
         renderItem={({ item }) => (
           <View style={[styles.card, item === stations[0] ? styles.bestCard : null]}>
             <Text style={styles.stationName}>{item.name}</Text>
-            <Text style={styles.stationAddress}>{item.location?.address || 'Address unavailable'}</Text>
+            <Text style={styles.stationAddress}>{item.location?.formatted_address || 'Address unavailable'}</Text>
             <Text style={styles.stationInfo}>Distance: {Math.round(item.distanceMeters)} meters</Text>
             <Text style={styles.stationInfo}>Weather: {item.weather?.weather?.[0]?.main || 'N/A'}</Text>
             <Text style={styles.stationInfo}>Score: {Math.round(item.score)}</Text>
@@ -291,9 +350,9 @@ export default function FuelStationRecommender() {
           </View>
         )}
         ListEmptyComponent={
-          !loading && (
+          !loading ? (
             <Text style={styles.emptyText}>No recommendations available.</Text>
-          )
+          ) : null
         }
       />
     </View>
@@ -382,4 +441,11 @@ const styles = StyleSheet.create({
   },
   navigateButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   emptyText: { textAlign: 'center', color: PURPLE, marginTop: 32, fontSize: 16 },
+  locationText: {
+    color: '#fff',
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
 });

@@ -1,16 +1,16 @@
 import axios from 'axios';
+import { API_CONFIG } from '../constants/api';
 
-// IMPORTANT: Use environment variables for your API key.
-// In your .env file:
-// EXPO_PUBLIC_FOURSQUARE_API_KEY="fsq..."
-const FOURSQUARE_API_KEY = process.env.EXPO_PUBLIC_FOURSQUARE_API_KEY;
-const API_URL = 'https://api.foursquare.com/v3/places';
+// Use API configuration instead of environment variables
+const FOURSQUARE_API_KEY = API_CONFIG.FOURSQUARE.API_KEY;
+const API_URL = 'https://places-api.foursquare.com/places';
 
 const foursquareApi = axios.create({
   baseURL: API_URL,
   headers: {
     Accept: 'application/json',
-    Authorization: FOURSQUARE_API_KEY || '',
+    Authorization: `Bearer ${FOURSQUARE_API_KEY}`,
+    'X-Places-Api-Version': API_CONFIG.FOURSQUARE.API_VERSION,
   },
 });
 
