@@ -11,24 +11,25 @@ export const API_CONFIG = {
   
   // OpenWeather API Configuration
   OPENWEATHER: {
-    API_KEY: "your_openweather_api_key_here", // Replace with your actual OpenWeather API key
+    API_KEY: "88b94965b8d3ac08524938bf0b195614",
     BASE_URL: "https://api.openweathermap.org/data/2.5"
   },
   
   // Supabase Configuration
   SUPABASE: {
-    URL: "your_supabase_url_here", // Replace with your actual Supabase URL
-    ANON_KEY: "your_supabase_anon_key_here" // Replace with your actual Supabase anon key
+    URL: "https://knkxlzqwtmiikxrqqylu.supabase.co", // Replace with your actual Supabase URL
+    ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtua3hsenF3dG1paWt4cnFxeWx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMzU0NzksImV4cCI6MjA2OTkxMTQ3OX0.LJGNhGCLtlNxhvBOOyI52qiO2cmsLKpzYlKo4fik-b8" // Replace with your actual Supabase anon key
   },
   
   // Firebase Configuration
   FIREBASE: {
-    API_KEY: "your_firebase_api_key_here", // Replace with your actual Firebase API key
-    AUTH_DOMAIN: "your_firebase_auth_domain_here",
-    PROJECT_ID: "your_firebase_project_id_here",
-    STORAGE_BUCKET: "your_firebase_storage_bucket_here",
-    MESSAGING_SENDER_ID: "your_firebase_messaging_sender_id_here",
-    APP_ID: "your_firebase_app_id_here"
+    API_KEY: "AIzaSyBgz7wpg1nkXZ9uuHyCgLRwAfZ_FzFAlJA", // Replace with your actual Firebase API key
+    AUTH_DOMAIN: "travelmate-07chss.firebaseapp.com",
+    PROJECT_ID: "travelmate-07chss",
+    STORAGE_BUCKET: "travelmate-07chss.firebasestorage.app",
+    MESSAGING_SENDER_ID: "985002644614",
+    APP_ID: "1:985002644614:web:bba90799c119c92ef76d07e",
+    databaseURL: "https://travelmate-07chss-default-rtdb.asia-southeast1.firebasedatabase.app/"
   }
 };
 

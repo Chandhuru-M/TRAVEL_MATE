@@ -201,17 +201,34 @@ export default function FuelStationRecommender() {
           const sLat = station.geocodes?.main?.latitude;
           const sLon = station.geocodes?.main?.longitude;
 
-          // Fetch weather
-          const weatherRes = await fetch(
-            `${API_CONFIG.OPENWEATHER.BASE_URL}/weather?lat=${sLat}&lon=${sLon}&appid=${OPENWEATHER_API_KEY}&units=metric`
-          );
-          const weatherData = await weatherRes.json();
-
-          // Simple weather penalty based on conditions
+          let weatherData = null;
           let weatherPenalty = 0;
-          const condition = (weatherData.weather?.[0]?.main ?? '').toLowerCase();
-          if (condition.includes('rain') || condition.includes('drizzle')) weatherPenalty = 100;
-          if (condition.includes('snow') || condition.includes('storm')) weatherPenalty = 200;
+
+          // Only fetch weather if we have valid coordinates
+          if (sLat && sLon) {
+            try {
+              console.log(`Fetching weather for ${station.name} at ${sLat}, ${sLon}`);
+              const weatherRes = await fetch(
+                `${API_CONFIG.OPENWEATHER.BASE_URL}/weather?lat=${sLat}&lon=${sLon}&appid=${OPENWEATHER_API_KEY}&units=metric`
+              );
+              
+              if (weatherRes.ok) {
+                weatherData = await weatherRes.json();
+                console.log(`Weather for ${station.name}:`, weatherData.weather?.[0]?.main);
+                
+                // Simple weather penalty based on conditions
+                const condition = (weatherData.weather?.[0]?.main ?? '').toLowerCase();
+                if (condition.includes('rain') || condition.includes('drizzle')) weatherPenalty = 100;
+                if (condition.includes('snow') || condition.includes('storm')) weatherPenalty = 200;
+              } else {
+                console.log(`Weather API failed for station ${station.name}:`, weatherRes.status);
+              }
+            } catch (error) {
+              console.log(`Weather fetch error for station ${station.name}:`, error);
+            }
+          } else {
+            console.log(`No coordinates for ${station.name}:`, { sLat, sLon });
+          }
 
           // Calculate score = distance + weather penalty
           const distanceMeters = station.distance ?? 1000;
@@ -330,7 +347,9 @@ export default function FuelStationRecommender() {
             <Text style={styles.stationName}>{item.name}</Text>
             <Text style={styles.stationAddress}>{item.location?.formatted_address || 'Address unavailable'}</Text>
             <Text style={styles.stationInfo}>Distance: {Math.round(item.distanceMeters)} meters</Text>
-            <Text style={styles.stationInfo}>Weather: {item.weather?.weather?.[0]?.main || 'N/A'}</Text>
+            <Text style={styles.stationInfo}>
+              Weather: {item.weather ? item.weather.weather?.[0]?.main : 'Fetching...'}
+            </Text>
             <Text style={styles.stationInfo}>Score: {Math.round(item.score)}</Text>
             <TouchableOpacity
               style={styles.navigateButton}
