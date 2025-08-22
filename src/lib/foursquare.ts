@@ -1,5 +1,4 @@
-// src/lib/foursquare.ts
-
+import axios from 'axios';
 import { Place } from './types';
 
 const API_KEY = process.env.EXPO_PUBLIC_FOURSQUARE_API_KEY;
@@ -10,7 +9,7 @@ interface FetchPlacesParams {
   lon: number;
   query?: string;
   limit?: number;
-  radius?: number;
+  radius?: number;  
 }
 
 export async function fetchPlaces(params: FetchPlacesParams): Promise<Place[]> {
@@ -37,15 +36,16 @@ export async function fetchPlaces(params: FetchPlacesParams): Promise<Place[]> {
   };
 
   try {
-    const response = await fetch(url, { headers });
-    if (!response.ok) {
-      // This will now properly report any future errors
-      throw new Error(`Foursquare API error: ${response.status} ${response.statusText}`);
-    }
-    const data = await response.json();
-    return data.results || data; // Handle cases where data is in 'results' or is the root object
-  } catch (error) {
+    console.log(url);
+    const response = await axios.get("https://places-api.foursquare.com/places/search",{
+      headers
+    });
+    console.log(response.data);    const data:any = response.data;
+    return data.results || data; 
+  } catch (error:any) {
     console.error('Failed to fetch from Foursquare:', error);
     throw error;
   }
 }
+
+
