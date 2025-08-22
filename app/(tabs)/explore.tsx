@@ -14,8 +14,6 @@ export default function ExploreScreen() {
   useEffect(() => {
     const loadPlaces = async () => {
       try {
-        // Using a fixed location for now (e.g., San Francisco)
-        // We will replace this with the user's actual location later.
         const fetchedPlaces = await fetchPlaces({
           lat: 37.7749,
           lon: -122.4194,
@@ -30,7 +28,7 @@ export default function ExploreScreen() {
     };
 
     loadPlaces();
-  }, []); // The empty array ensures this runs only once when the screen mounts
+  }, []);
 
   if (isLoading) {
     return (
@@ -52,7 +50,10 @@ export default function ExploreScreen() {
     <FlatList
       data={places}
       renderItem={({ item }) => <PlaceCard place={item} />}
-      keyExtractor={(item) => item.fsq_id}
+      // --- THIS IS THE MORE ROBUST FIX ---
+      // It uses the unique fsq_id, but if it's missing, it falls back to the item's index.
+      keyExtractor={(item, index) => item.fsq_id || index.toString()}
+      // ------------------------------------
       contentContainerStyle={styles.list}
     />
   );
