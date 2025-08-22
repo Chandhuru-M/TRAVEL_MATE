@@ -40,7 +40,8 @@ export async function fetchPlaces(params: FetchPlacesParams): Promise<Place[]> {
     const response = await axios.get("https://places-api.foursquare.com/places/search",{
       headers
     });
-    console.log(response.data);    const data:any = response.data;
+    console.log(response.data);    
+    const data:any = response.data;
     return data.results || data; 
   } catch (error:any) {
     console.error('Failed to fetch from Foursquare:', error);
