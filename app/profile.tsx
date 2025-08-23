@@ -8,9 +8,8 @@ import { colors } from '@/constants/Colors'; // 2. Import colors
 
 export default function ProfileScreen() {
   const { signOut } = useAuth();
-  const { theme } = useTheme(); // 3. Get the current theme
-
-  // Define dynamic styles that depend on the theme
+  const { theme } = useTheme(); 
+  
   const dynamicStyles = {
     container: {
       backgroundColor: colors.background[theme],
