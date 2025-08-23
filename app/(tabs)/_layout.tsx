@@ -2,15 +2,28 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
+import { useTheme } from '@/context/ThemeContext'; // 1. Import the useTheme hook
+import { colors } from '@/constants/Colors'; // 2. Import our color palette
 
 export default function TabLayout() {
+  const { theme } = useTheme(); // 3. Get the current theme
+
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#3b82f6',
+        // 4. Make all colors dynamic based on the theme
+        tabBarActiveTintColor: colors.primary[theme],
+        tabBarInactiveTintColor: colors.textMuted[theme], // Set color for inactive tabs
         headerShown: false,
-        tabBarStyle: { backgroundColor: '#0f172a', borderTopColor: '#334155', height: 60, paddingBottom: 5 },
-        tabBarLabelStyle: { fontSize: 12 },
+        tabBarStyle: {
+          backgroundColor: colors.background[theme], // Dynamic background color
+          borderTopColor: colors.border[theme],      // Dynamic border color
+          height: 70,
+          paddingBottom: 5,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+        },
       }}>
       <Tabs.Screen
         name="home"
