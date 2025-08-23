@@ -5,41 +5,42 @@ import { Place } from '@/lib/types';
 import { FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { useTheme } from '@/context/ThemeContext';
+import { colors } from '@/constants/Colors';
 
-interface PlaceCardProps {
-  place: Place;
-}
+export default function PlaceCard({ place }: { place: Place }) {
+  const { theme } = useTheme();
 
-const PlaceCard = ({ place }: PlaceCardProps) => {
   const handlePress = () => {
     router.push(`/place/${place.fsq_id}` as any);
   };
 
   return (
-    <TouchableOpacity style={styles.card} onPress={handlePress}>
+    <TouchableOpacity
+      style={[styles.card, { backgroundColor: colors.card[theme] }]}
+      onPress={handlePress}
+    >
       <LinearGradient colors={['#E0E7FF', '#C7D2FE']} style={styles.imagePlaceholder} />
       <View style={styles.content}>
-        <Text style={styles.title} numberOfLines={1}>{place.name}</Text>
+        <Text style={[styles.title, { color: colors.text[theme] }]} numberOfLines={1}>{place.name}</Text>
         <View style={styles.locationContainer}>
-          <FontAwesome name="map-pin" size={14} color="#94a3b8" />
-          <Text style={styles.address} numberOfLines={1}>{place.location?.formatted_address}</Text>
+          <FontAwesome name="map-pin" size={14} color={colors.textMuted[theme]} />
+          <Text style={[styles.address, { color: colors.textMuted[theme] }]} numberOfLines={1}>{place.location?.formatted_address}</Text>
         </View>
       </View>
     </TouchableOpacity>
   );
 };
 
-// Add professional styles
 const styles = StyleSheet.create({
     card: {
-        backgroundColor: '#1e293b',
         borderRadius: 12,
         marginVertical: 8,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 5,
-        elevation: 5,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
     },
     imagePlaceholder: {
         width: '100%',
@@ -53,7 +54,6 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: 'white',
         marginBottom: 4,
     },
     locationContainer: {
@@ -62,10 +62,7 @@ const styles = StyleSheet.create({
     },
     address: {
         fontSize: 14,
-        color: '#94a3b8',
         marginLeft: 6,
         flexShrink: 1,
     },
 });
-
-export default PlaceCard;
