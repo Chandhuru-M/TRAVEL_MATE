@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
+import { StatusBar } from 'expo-status-bar'; // Import StatusBar
 
 export default function SignUpScreen() {
   const [email, setEmail] = useState('');
@@ -17,7 +18,6 @@ export default function SignUpScreen() {
       Alert.alert('Sign Up Error', error);
     } else if (successMessage) {
       Alert.alert('Success', successMessage, [
-        // Use router.replace so the user can't go "back" to the signup page
         { text: 'OK', onPress: () => router.replace('/login' as any) },
       ]);
     }
@@ -26,6 +26,8 @@ export default function SignUpScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* FIX: Ensure status bar text is light on this screen */}
+      <StatusBar style="light" />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardView}>
         <View style={styles.innerContainer}>
           <Text style={styles.title}>Create Account</Text>
@@ -55,11 +57,9 @@ export default function SignUpScreen() {
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>Already have an account? </Text>
-            {/* --- THIS IS THE FIX --- */}
             <TouchableOpacity onPress={() => router.push('/login' as any)}>
               <Text style={styles.link}>Sign In</Text>
             </TouchableOpacity>
-            {/* ----------------------- */}
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -67,7 +67,6 @@ export default function SignUpScreen() {
   );
 }
 
-// Styles remain the same
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f172a' },
   keyboardView: { flex: 1 },

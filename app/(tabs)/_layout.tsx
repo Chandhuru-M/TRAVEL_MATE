@@ -13,20 +13,24 @@ export default function TabLayout() {
         tabBarLabelStyle: { fontSize: 12 },
       }}>
       <Tabs.Screen
-        name="explore"
-        options={{ title: 'Explore', tabBarIcon: ({ color }) => <FontAwesome name="search" size={28} color={color} /> }}
+        name="home"
+        options={{ title: 'Home', tabBarIcon: ({ color }) => <FontAwesome name="home" size={28} color={color} /> }}
       />
       <Tabs.Screen
-        name="recommend"
-        options={{ title: 'Recommend', tabBarIcon: ({ color }) => <FontAwesome name="star" size={28} color={color} /> }}
+        name="map"
+        options={{ title: 'Map', tabBarIcon: ({ color }) => <FontAwesome name="map-marker" size={28} color={color} /> }}
       />
       <Tabs.Screen
-        name="chat"
-        options={{ title: 'Chat', tabBarIcon: ({ color }) => <FontAwesome name="comments" size={28} color={color} /> }}
+        name="trip-planner"
+        options={{ title: 'Trip Planner', tabBarIcon: ({ color }) => <FontAwesome name="suitcase" size={28} color={color} /> }}
       />
       <Tabs.Screen
-        name="more"
-        options={{ title: 'More', tabBarIcon: ({ color }) => <FontAwesome name="bars" size={28} color={color} /> }}
+        name="wallet"
+        options={{ title: 'Wallet', tabBarIcon: ({ color }) => <FontAwesome name="google-wallet" size={28} color={color} /> }}
+      />
+      <Tabs.Screen
+        name="pre-booking"
+        options={{ title: 'Bookings', tabBarIcon: ({ color }) => <FontAwesome name="ticket" size={28} color={color} /> }}
       />
     </Tabs>
   );
