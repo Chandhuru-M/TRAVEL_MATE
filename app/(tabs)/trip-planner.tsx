@@ -1,18 +1,17 @@
 // app/(tabs)/trip-planner.tsx
-import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, FlatList, Alert } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import CustomHeader from '@/components/CustomHeader';
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
-import { useTripStore } from '@/services/tripService'; // Import our new store
+import { useTripStore } from '@/services/tripService';
 import { TripPlan } from '@/lib/types';
 import { router } from 'expo-router';
 
-// A new component for rendering a single Trip Plan card
 const TripPlanCard = ({ plan, isActive }: { plan: TripPlan; isActive: boolean }) => {
   const { theme } = useTheme();
-  const { setActiveTripPlan } = useTripStore();
+  const { setActiveTripPlan } = useTripStore.getState();
 
   const handleSetActive = () => {
     Alert.alert(
@@ -23,7 +22,6 @@ const TripPlanCard = ({ plan, isActive }: { plan: TripPlan; isActive: boolean })
         { text: "Set Active", onPress: () => setActiveTripPlan(plan.id) }
       ]
     );
-    router.push('/create-trip');
   };
 
   return (
@@ -33,20 +31,25 @@ const TripPlanCard = ({ plan, isActive }: { plan: TripPlan; isActive: boolean })
     >
       <Text style={[styles.cardTitle, { color: colors.text[theme] }]}>{plan.name}</Text>
       <Text style={[styles.cardSubtitle, { color: colors.textMuted[theme] }]}>{plan.destination}</Text>
-      {/* We can add a budget progress bar here in the future */}
     </TouchableOpacity>
   );
 };
 
 export default function TripPlannerScreen() {
   const { theme } = useTheme();
-  const { tripPlans, activeTripPlanId } = useTripStore(); // Get data from the store
+  const { tripPlans, activeTripPlanId, isLoaded, fetchTripPlans } = useTripStore();
 
-  const handleCreateTrip = () => {
-    // For now, we'll create a mock trip. Later, this would open a form.
-    // This is an integration point for your team.
-    Alert.alert("Create Trip", "A form to create a new trip plan will be integrated here.");
-  };
+  useEffect(() => {
+    fetchTripPlans();
+  }, [fetchTripPlans]);
+
+  if (!isLoaded) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background[theme], justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color={colors.primary[theme]}/>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background[theme] }}>
@@ -56,7 +59,7 @@ export default function TripPlannerScreen() {
           <FontAwesome name="suitcase" size={80} color={colors.textMuted[theme]} />
           <Text style={[styles.emptyTitle, { color: colors.text[theme] }]}>No Trips Planned</Text>
           <Text style={[styles.emptySubtitle, { color: colors.textMuted[theme] }]}>Let's create your first adventure!</Text>
-          <TouchableOpacity style={styles.createButton} onPress={handleCreateTrip}>
+          <TouchableOpacity style={styles.createButton} onPress={() => router.push('/create-trip' as any)}>
             <Text style={styles.createButtonText}>Create New Trip</Text>
           </TouchableOpacity>
         </View>
@@ -66,7 +69,7 @@ export default function TripPlannerScreen() {
           renderItem={({ item }) => <TripPlanCard plan={item} isActive={item.id === activeTripPlanId} />}
           keyExtractor={(item) => item.id}
           ListHeaderComponent={
-            <TouchableOpacity style={styles.createButton} onPress={handleCreateTrip}>
+            <TouchableOpacity style={styles.createButton} onPress={() => router.push('/create-trip' as any)}>
               <Text style={styles.createButtonText}>Create New Trip</Text>
             </TouchableOpacity>
           }
