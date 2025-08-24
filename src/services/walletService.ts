@@ -1,58 +1,86 @@
 // src/services/walletService.ts
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Transaction } from '../lib/types';
+import { Transaction } from '@/lib/types';
 import uuid from 'react-native-uuid';
+import { supabase } from '@/lib/supabase';
 
+// ... (Interfaces remain the same)
 interface WalletState {
+  isLoaded: boolean;
+  isNewUserWallet: boolean;
   balance: number;
   transactions: Transaction[];
 }
-
 interface WalletActions {
-  addTransaction: (details: Omit<Transaction, 'id' | 'timestamp'>, deductFromBalance: boolean) => void;
-  deleteTransaction: (transactionId: string) => void;
-  // --- THIS IS THE FIX ---
-  // We must declare the function in the interface.
-  setBalance: (newBalance: number) => void;
-  // -----------------------
+  fetchWalletData: () => Promise<void>;
+  initializeWallet: (initialBalance: number) => Promise<void>;
+  addTransaction: (details: Omit<Transaction, 'id' | 'timestamp'>, deductFromBalance: boolean) => Promise<void>;
+  setBalance: (newBalance: number) => Promise<void>;
+  deleteTransaction: (transactionId: string) => Promise<void>;
+  clearWalletData: () => void;
 }
 
+const _updateDb = async (newState: { balance: number; transactions: Transaction[] }) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from('wallets').update(newState).eq('user_id', user.id);
+};
+
+// --- THIS IS THE FIX ---
+// Added the 'export' keyword.
 export const useWalletStore = create<WalletState & WalletActions>()(
-  persist(
-    (set, get) => ({
-      balance: 50000, // Starting with a mock balance
-      transactions: [],
+  (set, get) => ({
+    isLoaded: false,
+    isNewUserWallet: false,
+    balance: 0,
+    transactions: [],
 
-      addTransaction: (details, deductFromBalance) => {
-        const newTransaction: Transaction = {
-          ...details,
-          id: uuid.v4() as string,
-          timestamp: new Date().toISOString(),
-        };
-        set((state) => ({
-          transactions: [newTransaction, ...state.transactions],
-          balance: deductFromBalance
-            ? state.balance - newTransaction.amount
-            : state.balance,
-        }));
-      },
+    fetchWalletData: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data, error } = await supabase.from('wallets').select('balance, transactions').eq('user_id', user.id).single();
+      if (data) {
+        set({ balance: data.balance, transactions: data.transactions, isLoaded: true, isNewUserWallet: false });
+      } else if (error && error.code === 'PGRST116') {
+        set({ isLoaded: true, isNewUserWallet: true, balance: 0, transactions: [] });
+      }
+    },
 
-      deleteTransaction: (transactionId) => {
-        set((state) => ({
-          transactions: state.transactions.filter((t) => t.id !== transactionId),
-        }));
-      },
+    initializeWallet: async (initialBalance) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: newWallet } = await supabase.from('wallets').upsert({ user_id: user.id, balance: initialBalance, transactions: [] }).select('balance, transactions').single();
+      if (newWallet) {
+        set({ balance: newWallet.balance, transactions: newWallet.transactions, isNewUserWallet: false });
+      }
+    },
 
-      // The implementation was already correct.
-      setBalance: (newBalance) => {
-        set({ balance: newBalance });
-      },
-    }),
-    {
-      name: 'travelmate-wallet-storage',
-      storage: createJSONStorage(() => AsyncStorage),
-    }
-  )
+    addTransaction: async (details, deductFromBalance) => {
+      const currentState = get();
+      if (currentState.isNewUserWallet) return;
+      const newTransaction: Transaction = { ...details, id: uuid.v4() as string, timestamp: new Date().toISOString() };
+      const newBalance = deductFromBalance ? currentState.balance - newTransaction.amount : currentState.balance;
+      const newTransactions = [newTransaction, ...currentState.transactions];
+      set({ balance: newBalance, transactions: newTransactions });
+      await _updateDb({ balance: newBalance, transactions: newTransactions });
+    },
+
+    setBalance: async (newBalance) => {
+      const currentState = get();
+      if (currentState.isNewUserWallet) return;
+      set({ balance: newBalance });
+      await _updateDb({ balance: newBalance, transactions: currentState.transactions });
+    },
+    
+    deleteTransaction: async (transactionId) => {
+      const currentState = get();
+      const newTransactions = currentState.transactions.filter((t) => t.id !== transactionId);
+      set({ transactions: newTransactions });
+      await _updateDb({ balance: currentState.balance, transactions: newTransactions });
+    },
+
+    clearWalletData: () => {
+      set({ balance: 0, transactions: [], isLoaded: false, isNewUserWallet: false });
+    },
+  })
 );
