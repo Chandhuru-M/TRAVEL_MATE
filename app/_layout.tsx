@@ -1,12 +1,13 @@
 // app/_layout.tsx
-import React, { useEffect } from 'react'; // Import useEffect
+import React, { useEffect } from 'react';
 import { Stack, SplashScreen, router } from 'expo-router';
-import { AuthProvider, useAuth } from '../src/context/AuthContext'; // Import Auth context
-import { View, StyleSheet } from 'react-native'; // Import View and StyleSheet
-import FloatingVoiceButton from '../src/components/FloatingVoiceButton'; // Import Floating Button
-import { StatusBar } from 'expo-status-bar'; // Import StatusBar
-import { ThemeProvider, useTheme } from '../src/context/ThemeContext'; // Import Theme context
-import { colors } from '../src/constants/Colors'; // Import colors
+import { AuthProvider, useAuth } from '../src/context/AuthContext';
+import { View, StyleSheet } from 'react-native';
+import FloatingChatButton from '../src/components/FloatingChatButton';
+import { StatusBar } from 'expo-status-bar';
+import { ThemeProvider, useTheme } from '../src/context/ThemeContext';
+import { colors } from '../src/constants/Colors';
+// import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const RootLayoutNav = () => {
   const { session, isLoading } = useAuth();
@@ -44,15 +45,15 @@ const RootLayoutNav = () => {
         <Stack.Screen name="fuel" options={{ ...headerStyleOptions, title: "Fuel Finder" }} />
         <Stack.Screen name="profile" options={{ ...headerStyleOptions, title: "Profile" }} />
         <Stack.Screen name="settings" options={{ ...headerStyleOptions, title: "Settings" }} />
-        <Stack.Screen name="create-trip" options={{ ...headerStyleOptions, title: "Create a New Trip" }} />
         <Stack.Screen name="add-transaction" options={{ ...headerStyleOptions, title: "Add New Transaction", presentation: 'modal' }} />
+        <Stack.Screen name="chat" options={{ ...headerStyleOptions, title: "AI Assistant", presentation: 'modal' }} />
       </Stack>
-      {session && <FloatingVoiceButton />}
+      {session && <FloatingChatButton />}
     </View>
   );
 };
-
 export default function RootLayout() {
+  // The wrapper is removed
   return (
     <ThemeProvider>
       <AuthProvider>
