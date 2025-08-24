@@ -1,24 +1,45 @@
 // src/lib/types.ts
 
-export interface LatLng { /* ... */ }
-export interface Place { /* ... */ }
+// --- FOURSQUARE / MOCK DATA TYPES ---
+export interface LatLng {
+  lat: number;
+  lng: number;
+}
 
-// --- CORRECTED DATA MODELS ---
+export interface Place {
+  fsq_id: string;
+  name: string;
+  categories: { name: string }[];
+  distance?: number;
+  location?: {
+    formatted_address?: string;
+    address?: string;
+    locality?: string;
+  };
+  geocodes?: {
+    main?: LatLng;
+  };
+  rating?: number;
+  price?: number;
+  photos?: { prefix: string; suffix: string }[];
+}
 
+
+// --- FINANCE / WALLET TYPES ---
 export interface Account {
-  id: string; // Was missing from some logic
+  id: string;
   user_id: string;
   name: string;
   type: 'bank_account' | 'credit_card' | 'cash' | 'e-wallet';
-  balance: number; // Was missing from some logic
+  balance: number;
   created_at: string;
 }
 
 export interface Transaction {
   id: string;
   user_id: string;
-  account_id: string; // Matched to DB
-  trip_id: string | null; // Matched to DB
+  account_id: string;
+  trip_id: string | null;
   description: string;
   amount: number;
   type: 'expense' | 'income';
@@ -26,6 +47,8 @@ export interface Transaction {
   timestamp: string;
 }
 
+
+// --- TRIP PLANNER TYPES ---
 export interface TripPlan {
   id: string;
   user_id: string;
