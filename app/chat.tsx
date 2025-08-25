@@ -13,7 +13,7 @@ const mockMessages = [
 
 export default function ChatScreen() {
   const { theme } = useTheme();
-
+  console.log("Entered Chat screen");
   const dynamicStyles = {
     container: { backgroundColor: colors.background[theme] },
     inputContainer: {

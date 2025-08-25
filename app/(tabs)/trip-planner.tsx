@@ -9,25 +9,19 @@ import { useTripStore } from '@/services/tripService';
 import { TripPlan } from '@/lib/types';
 import { router } from 'expo-router';
 
-const TripPlanCard = ({ plan, isActive }: { plan: TripPlan; isActive: boolean }) => {
+const TripPlanCard = ({ plan }: { plan: TripPlan }) => {
   const { theme } = useTheme();
-  const { setActiveTripPlan } = useTripStore.getState();
 
-  const handleSetActive = () => {
-    Alert.alert(
-      "Set Active Trip",
-      `Make "${plan.name}" your active trip? Recommendations will be tailored for this plan.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Set Active", onPress: () => setActiveTripPlan(plan.id) }
-      ]
-    );
+  const handlePress = () => {
+    // --- THIS IS THE FIX ---
+    // Cast the dynamic route to 'as any' to satisfy TypeScript
+    router.push(`/trip/${plan.id}` as any);
   };
 
   return (
     <TouchableOpacity
-      style={[styles.card, { backgroundColor: colors.card[theme], borderColor: isActive ? colors.primary[theme] : 'transparent' }]}
-      onPress={handleSetActive}
+      style={[styles.card, { backgroundColor: colors.card[theme] }]}
+      onPress={handlePress}
     >
       <Text style={[styles.cardTitle, { color: colors.text[theme] }]}>{plan.name}</Text>
       <Text style={[styles.cardSubtitle, { color: colors.textMuted[theme] }]}>{plan.destination}</Text>
@@ -37,7 +31,7 @@ const TripPlanCard = ({ plan, isActive }: { plan: TripPlan; isActive: boolean })
 
 export default function TripPlannerScreen() {
   const { theme } = useTheme();
-  const { tripPlans, activeTripPlanId, isLoaded, fetchTripPlans } = useTripStore();
+  const { tripPlans, isLoaded, fetchTripPlans } = useTripStore();
 
   useEffect(() => {
     fetchTripPlans();
@@ -66,7 +60,7 @@ export default function TripPlannerScreen() {
       ) : (
         <FlatList
           data={tripPlans}
-          renderItem={({ item }) => <TripPlanCard plan={item} isActive={item.id === activeTripPlanId} />}
+          renderItem={({ item }) => <TripPlanCard plan={item} />}
           keyExtractor={(item) => item.id}
           ListHeaderComponent={
             <TouchableOpacity style={styles.createButton} onPress={() => router.push('/create-trip' as any)}>
@@ -87,7 +81,7 @@ const styles = StyleSheet.create({
   createButton: { backgroundColor: '#2563eb', paddingVertical: 14, paddingHorizontal: 30, borderRadius: 8, margin: 16, alignItems: 'center' },
   createButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
   list: { padding: 16 },
-  card: { padding: 20, borderRadius: 12, marginBottom: 16, borderWidth: 2 },
+  card: { padding: 20, borderRadius: 12, marginBottom: 16, borderWidth: 2, borderColor: 'transparent' },
   cardTitle: { fontSize: 20, fontWeight: 'bold' },
   cardSubtitle: { fontSize: 16, marginTop: 4 },
 });
