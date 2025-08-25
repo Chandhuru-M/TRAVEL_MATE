@@ -49,6 +49,9 @@ const RootLayoutNav = () => {
         <Stack.Screen name="chat" options={{ ...headerStyleOptions, title: "AI Assistant", presentation: 'modal' }} />
         <Stack.Screen name="create-account" options={{ ...headerStyleOptions, title: "Create New Account", presentation: 'modal' }} />
         <Stack.Screen name="transaction-history" options={{ ...headerStyleOptions, title: "Transaction History" }} />
+        <Stack.Screen name="trip/[id]" options={{ ...headerStyleOptions, title: "Trip Details" }} />
+        <Stack.Screen name="add-to-itinerary" options={{ ...headerStyleOptions, title: "Add to Itinerary", presentation: 'modal' }} />
+      
       </Stack>
       {session && <FloatingChatButton />}
     </View>

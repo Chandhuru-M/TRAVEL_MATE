@@ -5,10 +5,9 @@ import { FontAwesome } from '@expo/vector-icons';
 import CustomHeader from '@/components/CustomHeader';
 import { useTheme } from '@/context/ThemeContext'; // Import useTheme
 import { colors } from '@/constants/Colors'; // Import colors
-console.log("Entered PreBooking screen");
 export default function PreBookingScreen() {
   const { theme } = useTheme(); // Get the current theme
-
+  console.log("Entered PreBooking screen");
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background[theme] }}>
       <CustomHeader />
