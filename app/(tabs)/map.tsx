@@ -5,9 +5,9 @@ import { FontAwesome } from '@expo/vector-icons';
 import CustomHeader from '@/components/CustomHeader';
 import { useTheme } from '@/context/ThemeContext'; // Import useTheme
 import { colors } from '@/constants/Colors'; // Import colors
-
+console.log("Entered Map screen");
 export default function MapScreen() {
-  const { theme } = useTheme(); // Get the current theme
+  const { theme } = useTheme(); 
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background[theme] }}>
