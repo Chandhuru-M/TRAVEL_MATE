@@ -13,10 +13,12 @@ interface ItineraryItemCardProps {
 export default function ItineraryItemCard({ item }: ItineraryItemCardProps) {
   const { theme } = useTheme();
 
-  // Render a different style for travel legs vs. attractions
+  // --- THIS IS THE FIX: CONDITIONAL RENDERING ---
+  // If the item is a 'travel' leg, render a special, simple view for it.
   if (item.type === 'travel') {
     return (
       <View style={styles.travelContainer}>
+        <View style={styles.travelLine} />
         <FontAwesome name="car" size={16} color={colors.textMuted[theme]} />
         <Text style={[styles.travelText, { color: colors.textMuted[theme] }]}>
           {item.travelDetails?.estimatedDuration} min travel to {item.travelDetails?.to}
@@ -25,17 +27,20 @@ export default function ItineraryItemCard({ item }: ItineraryItemCardProps) {
     );
   }
 
+  // Otherwise, render the full, detailed card for an attraction or restaurant.
   return (
     <TouchableOpacity style={[styles.card, { backgroundColor: colors.card[theme] }]}>
       <View style={styles.timeContainer}>
         <Text style={[styles.timeText, { color: colors.text[theme] }]}>{item.startTime}</Text>
-        <View style={[styles.timeLine, { backgroundColor: colors.border[theme] }]} />
-        <Text style={[styles.timeText, { color: colors.text[theme] }]}>{item.endTime}</Text>
       </View>
       <View style={styles.detailsContainer}>
+        {/* We use optional chaining (?.) here for maximum safety */}
         <Text style={[styles.title, { color: colors.text[theme] }]}>{item.place?.name}</Text>
         <Text style={[styles.address, { color: colors.textMuted[theme] }]}>{item.place?.location?.formatted_address}</Text>
         {item.notes && <Text style={[styles.notes, { color: colors.text[theme] }]}>Notes: {item.notes}</Text>}
+      </View>
+      <View style={styles.durationContainer}>
+        <Text style={[styles.timeText, { color: colors.textMuted[theme] }]}>{item.endTime}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -46,20 +51,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 16,
     borderRadius: 12,
+    marginHorizontal: 16,
     marginBottom: 16,
+    alignItems: 'center',
   },
   timeContainer: {
     alignItems: 'center',
     marginRight: 16,
   },
+  durationContainer: {
+    alignItems: 'center',
+    marginLeft: 16,
+  },
   timeText: {
     fontWeight: 'bold',
     fontSize: 14,
-  },
-  timeLine: {
-    width: 2,
-    flex: 1,
-    marginVertical: 8,
   },
   detailsContainer: {
     flex: 1,
@@ -80,9 +86,17 @@ const styles = StyleSheet.create({
   travelContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 16,
     paddingHorizontal: 16,
-    gap: 8,
+    gap: 12,
+  },
+  travelLine: {
+    width: 2,
+    height: '100%',
+    backgroundColor: '#334155', // A subtle line color
+    position: 'absolute',
+    left: 24,
+    top: -16, // Extend line to connect with card above
   },
   travelText: {
     fontSize: 14,
