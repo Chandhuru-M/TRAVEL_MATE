@@ -1,27 +1,30 @@
 // src/components/PlaceCard.tsx
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native'; // 1. Import ViewStyle
 import { Place } from '@/lib/types';
 import { FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
-import { useTripStore } from '@/services/tripService'; // Assuming you still have a trip service
 
-export default function PlaceCard({ place }: { place: Place }) {
+// 2. Define the props to include an optional style
+interface PlaceCardProps {
+  place: Place;
+  style?: ViewStyle;
+}
+
+export default function PlaceCard({ place, style }: PlaceCardProps) { // 3. Destructure the style prop
   const { theme } = useTheme();
   
   const handlePress = () => {
-    // --- THIS IS THE FIX ---
-    // Changed fsq_id to fsq_id to match the type definition
     router.push(`/place/${place.fsq_id}` as any);
-    // -----------------------
   };
 
   return (
+    // 4. Apply the passed-in style to the root component
     <TouchableOpacity
-      style={[styles.card, { backgroundColor: colors.card[theme] }]}
+      style={[styles.card, { backgroundColor: colors.card[theme] }, style]}
       onPress={handlePress}
     >
       <LinearGradient colors={['#E0E7FF', '#C7D2FE']} style={styles.imagePlaceholder} />
