@@ -1,33 +1,65 @@
 // src/services/tripService.ts
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
-import { TripPlan } from '@/lib/types';
+import { TripPlan, Place, ItineraryItem } from '@/lib/types';
+import uuid from 'react-native-uuid';
+import { addMinutes, format, parse, differenceInMinutes } from 'date-fns';
 
+// Internal helper function to recalculate travel legs for a given day's events
+const _recalculateAndFormatDayItinerary = (dayItinerary: ItineraryItem[]) => {
+  const newDayItinerary: ItineraryItem[] = [];
+  const sortedEvents = dayItinerary.filter(i => i.type !== 'travel').sort((a, b) => a.startTime.localeCompare(b.startTime));
+  let lastItem: ItineraryItem | null = null;
+  for (const event of sortedEvents) {
+    if (lastItem) {
+      const travelEndTime = parse(event.startTime, 'HH:mm', new Date());
+      const travelStartTime = parse(lastItem.endTime, 'HH:mm', new Date());
+      const duration = differenceInMinutes(travelEndTime, travelStartTime);
+      if (duration > 0) {
+        const travelItem: ItineraryItem = {
+          id: uuid.v4() as string, day: event.day, startTime: lastItem.endTime, endTime: event.startTime, type: 'travel',
+          travelDetails: { from: lastItem.place!.name, to: event.place!.name, mode: 'car', estimatedDuration: duration },
+        };
+        newDayItinerary.push(travelItem);
+      }
+    }
+    newDayItinerary.push(event);
+    lastItem = event;
+  }
+  return newDayItinerary;
+};
+
+// The complete and correct interface for our store
 interface TripState {
-  isLoaded: boolean; // <-- THE MISSING PROPERTY
+  isLoaded: boolean;
   tripPlans: TripPlan[];
   activeTripPlanId: string | null;
   fetchTripPlans: () => Promise<void>;
   createTripPlan: (details: any) => Promise<void>;
   setActiveTripPlan: (tripId: string | null) => void;
+  savePlaceToTrip: (tripId: string, place: Place) => Promise<{ success: boolean; error?: string }>;
+  addItineraryItem: (tripId: string, itemDetails: Omit<ItineraryItem, 'id' | 'type'>) => Promise<void>;
+  updateItineraryItem: (tripId: string, updatedItem: ItineraryItem) => Promise<void>;
+  deleteItineraryItem: (tripId: string, itemId: string) => Promise<void>;
+  deleteTripPlan: (tripId: string) => Promise<void>;
+  moveSavedPlaceToItinerary: (tripId: string, day: number, place: Place, durationInMinutes: number) => Promise<{ success: boolean; error?: string }>;
 }
 
 export const useTripStore = create<TripState>((set, get) => ({
-  isLoaded: false, // <-- INITIALIZE THE STATE
+  isLoaded: false,
   tripPlans: [],
   activeTripPlanId: null,
 
   fetchTripPlans: async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      set({ isLoaded: true }); // If no user, we are "loaded" but have no data
+      set({ isLoaded: true, tripPlans: [] });
       return;
     }
-
     const { data, error } = await supabase.from('trip_plans').select('*').order('created_at', { ascending: false });
-
     if (error) {
       console.error("Error fetching trip plans:", error);
+      set({ isLoaded: true });
     } else {
       set({ tripPlans: (data as TripPlan[]) || [], isLoaded: true });
     }
@@ -52,5 +84,105 @@ export const useTripStore = create<TripState>((set, get) => ({
 
   setActiveTripPlan: (tripId) => {
     set({ activeTripPlanId: tripId });
+  },
+
+  savePlaceToTrip: async (tripId, place) => {
+    const trip = get().tripPlans.find(p => p.id === tripId);
+    if (!trip) { return { success: false, error: "Trip not found." }; }
+    if (trip.saved_places.some(p => p.fsq_id === place.fsq_id)) { return { success: true }; }
+    const updatedSavedPlaces = [...trip.saved_places, place];
+    const { error } = await supabase.from('trip_plans').update({ saved_places: updatedSavedPlaces }).eq('id', tripId);
+    if (error) {
+      console.error("Error saving place:", error);
+      return { success: false, error: error.message };
+    }
+    set(state => ({
+      tripPlans: state.tripPlans.map(p =>
+        p.id === tripId ? { ...p, saved_places: updatedSavedPlaces } : p
+      ),
+    }));
+    return { success: true };
+  },
+
+  addItineraryItem: async (tripId, itemDetails) => {
+    const trip = get().tripPlans.find(p => p.id === tripId);
+    if (!trip) return;
+    const newItem: ItineraryItem = { ...itemDetails, id: uuid.v4() as string, type: 'attraction' };
+    const dayItinerary = [...(trip.itinerary || []).filter(i => i.day === newItem.day), newItem];
+    const otherDaysItinerary = (trip.itinerary || []).filter(i => i.day !== newItem.day);
+    const newFullItinerary = [...otherDaysItinerary, ..._recalculateAndFormatDayItinerary(dayItinerary)];
+    await supabase.from('trip_plans').update({ itinerary: newFullItinerary }).eq('id', tripId);
+    set(state => ({ tripPlans: state.tripPlans.map(p => p.id === tripId ? { ...p, itinerary: newFullItinerary } : p) }));
+  },
+
+  updateItineraryItem: async (tripId, updatedItem) => {
+    const trip = get().tripPlans.find(p => p.id === tripId);
+    if (!trip) return;
+    const dayItinerary = (trip.itinerary || []).filter(i => i.day === updatedItem.day).map(item => item.id === updatedItem.id ? updatedItem : item);
+    const otherDaysItinerary = (trip.itinerary || []).filter(i => i.day !== updatedItem.day);
+    const newFullItinerary = [...otherDaysItinerary, ..._recalculateAndFormatDayItinerary(dayItinerary)];
+    await supabase.from('trip_plans').update({ itinerary: newFullItinerary }).eq('id', tripId);
+    set(state => ({ tripPlans: state.tripPlans.map(p => p.id === tripId ? { ...p, itinerary: newFullItinerary } : p) }));
+  },
+
+  deleteItineraryItem: async (tripId, itemId) => {
+    const trip = get().tripPlans.find(p => p.id === tripId);
+    if (!trip) return;
+    const itemToDelete = trip.itinerary.find(i => i.id === itemId);
+    if (!itemToDelete) return;
+    const dayItinerary = (trip.itinerary || []).filter(i => i.day === itemToDelete.day && i.id !== itemId);
+    const otherDaysItinerary = (trip.itinerary || []).filter(i => i.day !== itemToDelete.day);
+    const newFullItinerary = [...otherDaysItinerary, ..._recalculateAndFormatDayItinerary(dayItinerary)];
+    await supabase.from('trip_plans').update({ itinerary: newFullItinerary }).eq('id', tripId);
+    set(state => ({ tripPlans: state.tripPlans.map(p => p.id === tripId ? { ...p, itinerary: newFullItinerary } : p) }));
+  },
+
+  deleteTripPlan: async (tripId: string) => {
+    const { error } = await supabase.from('trip_plans').delete().eq('id', tripId);
+    if (error) {
+      console.error("Error deleting trip:", error);
+      return;
+    }
+    set(state => ({
+      tripPlans: state.tripPlans.filter(p => p.id !== tripId),
+      activeTripPlanId: state.activeTripPlanId === tripId ? null : state.activeTripPlanId,
+    }));
+  },
+
+  moveSavedPlaceToItinerary: async (tripId, day, place, durationInMinutes) => {
+    const trip = get().tripPlans.find(p => p.id === tripId);
+    if (!trip) return { success: false, error: "Trip not found." };
+
+    const dayItinerary = (trip.itinerary || []).filter(item => item.day === day).sort((a, b) => a.startTime.localeCompare(b.startTime));
+    const lastItem = dayItinerary[dayItinerary.length - 1];
+    let newEventStartTime: Date;
+    if (lastItem) {
+      newEventStartTime = addMinutes(parse(lastItem.endTime, 'HH:mm', new Date()), 30);
+    } else {
+      newEventStartTime = parse('09:00', 'HH:mm', new Date());
+    }
+    const newEventEndTime = addMinutes(newEventStartTime, durationInMinutes);
+    const newItineraryItem: ItineraryItem = {
+      id: uuid.v4() as string, day, startTime: format(newEventStartTime, 'HH:mm'), endTime: format(newEventEndTime, 'HH:mm'), type: 'attraction', place: place,
+    };
+    
+    const newDayItinerary = [...dayItinerary, newItineraryItem];
+    const otherDaysItinerary = (trip.itinerary || []).filter(i => i.day !== day);
+    const newFullItinerary = [...otherDaysItinerary, ..._recalculateAndFormatDayItinerary(newDayItinerary)];
+    
+    const updatedSavedPlaces = trip.saved_places.filter(p => p.fsq_id !== place.fsq_id);
+
+    const { error } = await supabase.from('trip_plans').update({ itinerary: newFullItinerary, saved_places: updatedSavedPlaces }).eq('id', tripId);
+    if (error) {
+      console.error("Error moving saved place:", error);
+      return { success: false, error: error.message };
+    }
+
+    set(state => ({
+      tripPlans: state.tripPlans.map(p =>
+        p.id === tripId ? { ...p, itinerary: newFullItinerary, saved_places: updatedSavedPlaces } : p
+      )
+    }));
+    return { success: true };
   },
 }));
