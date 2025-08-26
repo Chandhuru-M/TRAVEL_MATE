@@ -16,7 +16,7 @@ export default function MapScreen() {
         <FontAwesome name="map-o" size={80} color={colors.textMuted[theme]} />
         <Text style={[styles.title, { color: colors.text[theme] }]}>Map View</Text>
         <Text style={[styles.subtitle, { color: colors.textMuted[theme] }]}>
-          The interactive Mapbox map will be integrated here.
+          Map view is not embedded. Use the chat's Get Directions to open Google Maps.
         </Text>
       </View>
     </SafeAreaView>
