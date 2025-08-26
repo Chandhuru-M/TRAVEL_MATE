@@ -1,3 +1,8 @@
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Linking, ActivityIndicator, ScrollView, Platform } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as Speech from 'expo-speech';
+import { getBestRoute, summarizeForSpeech, type RouteSummary } from '@/services/directions';
 import { colors } from '@/constants/Colors';
 // Avoid importing WebView on native to prevent RNCWebView missing module in Expo Go
 const WebView: any = Platform.OS === 'web' ? require('react-native-webview').WebView : null;
@@ -91,8 +96,13 @@ export default function Directions() {
           <TouchableOpacity onPress={() => router.push({ pathname: '/live-navigation' as any, params: { lat: destLat, lng: destLng, name: destName, profile: 'walking' } })} style={[styles.button, { backgroundColor: '#10b981' }]}> 
             <Text style={[styles.buttonText, { color: 'white' }]}>Start Live Nav</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={openInMaps} style={[styles.button, { backgroundColor: colors.primary.light }]}> 
+          <TouchableOpacity onPress={openInMaps} style={[styles.button, { backgroundColor: colors.primary.light, flexDirection: 'row', alignItems: 'center' }]}> 
             <Text style={[styles.buttonText, { color: 'white' }]}>Open in Google Maps</Text>
+            {summary && (
+              <Text style={{ color: 'white', marginLeft: 8, fontSize: 13 }}>
+                { (summary.distance_m/1000).toFixed(1) } km
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
