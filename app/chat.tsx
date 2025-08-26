@@ -50,7 +50,6 @@ export default function ChatScreen() {
   useEffect(() => {
     endRef.current?.scrollToEnd({ animated: true });
   }, [messages, loading]);
-
   const dynamicStyles = {
     container: { backgroundColor: colors.background[theme] },
     inputContainer: {
@@ -134,7 +133,7 @@ export default function ChatScreen() {
                   <TouchableOpacity key={p.id} style={styles.placeCard} onPress={() => openMaps(p)}>
                     <Text style={[styles.placeTitle, { color: colors.text[theme] }]}>{p.name}</Text>
                     <Text style={[styles.placeSubtitle, { color: colors.textMuted[theme] }]} numberOfLines={2}>{p.address}</Text>
-                    <Text style={[styles.placeMeta, { color: colors.textMuted[theme] }]}>
+                    <Text style={[styles.placeMeta, { color: colors.textMuted[theme] }]}> 
                       {p.category || 'Place'}{p.rating ? ` • ⭐ ${p.rating}` : ''}{userLocation ? ` • ${(haversine(userLocation.lat, userLocation.lng, p.latitude, p.longitude)).toFixed(1)} km` : ''}
                     </Text>
                     <View style={styles.directionsRow}>

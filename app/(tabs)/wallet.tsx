@@ -57,7 +57,7 @@ const AccountCard = ({ item }: { item: Account }) => {
 export default function WalletScreen() {
   const { theme } = useTheme();
   const { accounts, transactions, isLoaded, fetchData } = useFinanceStore();
-
+  console.log("Entered Wallet screen");
   useEffect(() => {
     fetchData();
   }, [fetchData]);

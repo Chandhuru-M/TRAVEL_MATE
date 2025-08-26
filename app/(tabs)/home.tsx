@@ -10,7 +10,10 @@ import { router } from 'expo-router';
 import { fetchPlaces } from '@/lib/foursquare';
 import { Place } from '@/lib/types';
 import * as Location from 'expo-location';
+import { useTripStore } from '@/services/tripService';
+import SelectActiveTripModal from '@/components/SelectActiveTripModal'; // Import the modal
 
+// Reusable component for horizontal carousels
 const CategoryCarousel = ({ title, places }: { title: string; places: Place[] }) => {
   const { theme } = useTheme();
   return (
@@ -19,16 +22,52 @@ const CategoryCarousel = ({ title, places }: { title: string; places: Place[] })
       <FlatList
         data={places}
         renderItem={({ item }) => <PlaceCard place={item} style={styles.carouselItem} />}
-        // --- THIS IS THE DEFINITIVE FIX ---
-        // Create a "composite key" that is guaranteed to be unique.
-        // It combines the item's ID with its index in the list.
         keyExtractor={(item, index) => `${item.fsq_id}-${index}`}
-        // ------------------------------------
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ paddingLeft: 16 }}
       />
     </View>
+  );
+};
+
+// Interactive banner for selecting the active trip
+const ActiveTripBanner = () => {
+  const { theme } = useTheme();
+  const { tripPlans, activeTripPlanId, setActiveTripPlan } = useTripStore();
+  const [modalVisible, setModalVisible] = useState(false);
+  
+  const activeTrip = tripPlans.find(p => p.id === activeTripPlanId);
+
+  const handleSelect = (tripId: string | null) => {
+    setActiveTripPlan(tripId);
+    setModalVisible(false);
+  };
+
+  return (
+    <>
+      <TouchableOpacity 
+        onPress={() => setModalVisible(true)} 
+        style={[styles.banner, { backgroundColor: colors.card[theme] }]}
+      >
+        <FontAwesome name="info-circle" size={20} color={colors.textMuted[theme]} style={{marginRight: 12}}/>
+        <View style={{flex: 1}}>
+          <Text style={{ color: colors.textMuted[theme] }}>
+            {activeTrip ? 'Active Trip: ' : 'Showing general recommendations.'}
+          </Text>
+          <Text style={{ color: activeTrip ? colors.text[theme] : colors.primary[theme], fontWeight: 'bold' }}>
+            {activeTrip ? activeTrip.name : 'Select a Trip'}
+          </Text>
+        </View>
+        <FontAwesome name="exchange" size={20} color={colors.textMuted[theme]} />
+      </TouchableOpacity>
+      <SelectActiveTripModal
+        isVisible={modalVisible}
+        trips={tripPlans}
+        onClose={() => setModalVisible(false)}
+        onSelect={handleSelect}
+      />
+    </>
   );
 };
 
@@ -64,6 +103,21 @@ export default function HomeScreen() {
 
   const reversedPlaces = useMemo(() => [...places].reverse(), [places]);
 
+  const renderContent = () => {
+    if (loading) {
+      return <ActivityIndicator size="large" color={colors.primary[theme]} style={{ marginTop: 50 }} />;
+    }
+    if (error) {
+      return <Text style={styles.errorText}>{error}</Text>;
+    }
+    return (
+      <>
+        <CategoryCarousel title="Popular Near You" places={places} />
+        <CategoryCarousel title="Top-Rated Restaurants" places={reversedPlaces} />
+      </>
+    );
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background[theme] }}>
       <CustomHeader />
@@ -81,15 +135,9 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {loading && <ActivityIndicator size="large" color={colors.primary[theme]} style={{ marginTop: 50 }} />}
-          {error && <Text style={styles.errorText}>{error}</Text>}
-          
-          {!loading && !error && (
-            <>
-              <CategoryCarousel title="Popular Near You" places={places} />
-              <CategoryCarousel title="Top-Rated Restaurants" places={reversedPlaces} />
-            </>
-          )}
+          <ActiveTripBanner />
+
+          {renderContent()}
 
           <TouchableOpacity onPress={() => router.push('/(tabs)/trip-planner' as any)}>
             <View style={[styles.ctaCard, { backgroundColor: colors.card[theme] }]}>
@@ -109,16 +157,23 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingBottom: 24 },
-  searchSection: { padding: 16 },
+  searchSection: { paddingHorizontal: 16, paddingTop: 16 },
   welcomeTitle: { fontSize: 28, fontWeight: 'bold', marginBottom: 16 },
   searchBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingHorizontal: 16, height: 50 },
   searchInput: { marginLeft: 12, fontSize: 16, flex: 1 },
-  carouselContainer: { marginBottom: 24 },
+  banner: {
+    flexDirection: 'row',
+    padding: 16,
+    margin: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  carouselContainer: { marginTop: 8, marginBottom: 24 },
   carouselTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 12, paddingHorizontal: 16 },
   carouselItem: { width: 280, marginRight: 16 },
   ctaCard: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, padding: 20, borderRadius: 12, marginTop: 16 },
   ctaTextContainer: { flex: 1, marginLeft: 16 },
   ctaTitle: { fontSize: 18, fontWeight: 'bold' },
   ctaSubtitle: { fontSize: 14, marginTop: 4 },
-  errorText: { color: '#ef4444', textAlign: 'center', marginVertical: 50, fontSize: 16, paddingHorizontal: 16 },
+  errorText: { color: '#ef4444', textAlign: 'center', marginTop: 50, fontSize: 16, paddingHorizontal: 16 },
 });
