@@ -8,6 +8,7 @@ import { Place } from '@/lib/types';
 import { router, useLocalSearchParams } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
 
+// A special card component for this screen with an "Add" button
 const AddPlaceCard = ({ place, onAdd }: { place: Place; onAdd: () => void }) => {
   const { theme } = useTheme();
   return (
@@ -27,12 +28,14 @@ const AddPlaceCard = ({ place, onAdd }: { place: Place; onAdd: () => void }) => 
 
 export default function AddToItineraryScreen() {
   const { theme } = useTheme();
+  // Get the tripId that was passed when navigating to this screen
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const { tripPlans, moveSavedPlaceToItinerary } = useTripStore.getState();
   
   const trip = tripPlans.find(p => p.id === tripId);
 
   const handleAddPlace = (place: Place) => {
+    // This is where the magic happens: we prompt the user for the schedule details
     Alert.prompt(
       `Add "${place.name}"`,
       "Enter the Day and Duration (in hours), separated by a comma (e.g., '1, 2.5').",
@@ -58,20 +61,20 @@ export default function AddToItineraryScreen() {
 
         if (result.success) {
           Alert.alert("Success!", `"${place.name}" has been added to your itinerary.`);
-          router.back();
+          router.back(); // Go back to the trip detail screen
         } else {
           Alert.alert("Error", result.error || "Could not add place to itinerary.");
         }
       },
       'plain-text',
-      '1, 2'
+      '1, 2' // Default prompt text: Day 1, 2 hours
     );
   };
 
   if (!trip) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background[theme], justifyContent: 'center' }}>
-        <ActivityIndicator />
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background[theme], justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator color={colors.primary[theme]} />
         <Text style={{ color: colors.text[theme], textAlign: 'center', marginTop: 20 }}>Loading trip details...</Text>
       </SafeAreaView>
     );
@@ -90,9 +93,9 @@ export default function AddToItineraryScreen() {
           </View>
         }
         ListEmptyComponent={
-          <View style={{alignItems: 'center', padding: 20, marginTop: 40}}>
+          <View style={styles.emptyContainer}>
             <FontAwesome name="bookmark-o" size={50} color={colors.textMuted[theme]} />
-            <Text style={{ color: colors.textMuted[theme], textAlign: 'center', marginTop: 16, fontSize: 16 }}>
+            <Text style={[styles.emptyText, { color: colors.textMuted[theme] }]}>
               You have no saved places for this trip. Go to the Home screen to find and save places first.
             </Text>
           </View>
@@ -129,9 +132,19 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 18, fontWeight: 'bold' },
   cardSubtitle: { fontSize: 14, marginTop: 4 },
   addButton: {
-    backgroundColor: '#22c55e',
+    backgroundColor: '#22c55e', // Green for "Add"
     padding: 12,
     borderRadius: 24,
     marginLeft: 12,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    padding: 20,
+    marginTop: 40,
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginTop: 16,
+    fontSize: 16,
   },
 });

@@ -2,103 +2,87 @@
 // @ts-nocheck
 
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator, useWindowDimensions, ScrollView, SectionList, TouchableOpacity, FlatList } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator, useWindowDimensions, ScrollView, TouchableOpacity, FlatList, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import { useTripStore } from '@/services/tripService';
 import { useFinanceStore } from '@/services/financeService';
 import { TabView, SceneMap, TabBar } from 'react-native-tab-view';
+import { differenceInDays } from 'date-fns';
 import ItineraryItemCard from '@/components/ItineraryItemCard';
 import PlaceCard from '@/components/PlaceCard';
 import TransactionItem from '@/components/TransactionItem';
-import { DndContext, Draggable, Droppable } from '@dnd-kit/core'; // Import DND components
 
-// --- THE FINAL, DRAGGABLE ITINERARY TAB ---
+// --- THE FINAL, VISUAL ITINERARY SCHEDULER ---
 const ItineraryRoute = ({ trip }) => {
   const { theme } = useTheme();
-  // We would use DndContext here to wrap the entire timeline
-  // Each ItineraryItemCard would be a <Draggable>
-  // The timeline itself would be a <Droppable> area
+  const { deleteItineraryItem } = useTripStore.getState();
+  const [selectedDay, setSelectedDay] = useState(1); // State to track the selected day
 
-  // This is a simplified representation of the UI. A full implementation
-  // requires significant state management for drag events (onDragStart, onDragEnd).
+  const totalDays = differenceInDays(new Date(trip.dates.end), new Date(trip.dates.start)) + 1;
+  const days = Array.from({ length: totalDays }, (_, i) => i + 1);
 
-  const handleDragEnd = (event) => {
-    // Handle drag end logic here
-    console.log('Drag ended:', event);
+  // Filter the itinerary for the currently selected day
+  const dayItinerary = useMemo(() => {
+    return (trip.itinerary || [])
+      .filter(item => item.day === selectedDay)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  }, [trip.itinerary, selectedDay]);
+
+  const handleAddItem = (day, startTime) => {
+    // Navigate to the form to create a NEW item, pre-filling the day and start time
+    router.push({ pathname: '/edit-itinerary-item', params: { tripId: trip.id, day, startTime } });
   };
 
-  const timeToPosition = (time) => {
-    // Convert time string to pixel position
-    const [hours, minutes] = time.split(':').map(Number);
-    return (hours * 60 + minutes) * 1; // 1 pixel per minute
+  const handleDelete = (item) => {
+    Alert.alert("Delete Event", `Are you sure you want to delete "${item.place?.name}"?`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: () => deleteItineraryItem(trip.id, item.id) }
+    ]);
   };
-
-  const durationToHeight = (startTime, endTime) => {
-    // Calculate height based on duration
-    const start = timeToPosition(startTime);
-    const end = timeToPosition(endTime);
-    return end - start;
-  };
-
-  // This is the onPress handler for the "Add" buttons
-  const handleOpenAddModal = () => {
-    router.push({
-      pathname: '/add-to-itinerary',
-      params: { tripId: trip.id }, // Pass the tripId as a parameter
-    });
-  };
-
-  const sections = useMemo(() => {
-    if (!trip?.itinerary) return [];
-    const grouped = trip.itinerary.reduce((acc, item) => {
-      const dayTitle = `Day ${item.day}`;
-      if (!acc[dayTitle]) { acc[dayTitle] = []; }
-      acc[dayTitle].push(item);
-      return acc;
-    }, {});
-    return Object.keys(grouped).map(dayTitle => ({ title: dayTitle, data: grouped[dayTitle] }));
-  }, [trip?.itinerary]);
-
-  if (sections.length === 0) {
-    return (
-      <View style={styles.emptySceneContainer}>
-        <Text style={[styles.emptySceneText, { color: colors.textMuted[theme] }]}>Your itinerary is empty.</Text>
-        <TouchableOpacity style={styles.addButton} onPress={handleOpenAddModal}>
-          <Text style={styles.addButtonText}>Add First Item</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
   return (
-    <DndContext onDragEnd={handleDragEnd}>
-      <ScrollView>
-        {/* Render timeline hours (00:00, 01:00, etc.) */}
-        <View style={styles.timelineContainer}>
-          {trip.itinerary.map(item => (
-            <Draggable key={item.id} id={item.id}>
-              {/* The ItineraryItemCard would be rendered here, positioned absolutely */}
-              <View style={[styles.eventCard, { top: timeToPosition(item.startTime), height: durationToHeight(item.startTime, item.endTime) }]}>
-                <Text>{item.title}</Text>
-              </View>
-            </Draggable>
+    <View style={{ flex: 1 }}>
+      {/* Day Selector Buttons */}
+      <View style={styles.daySelectorContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {days.map(day => (
+            <TouchableOpacity
+              key={day}
+              style={[
+                styles.dayButton,
+                selectedDay === day && { backgroundColor: colors.primary[theme] }
+              ]}
+              onPress={() => setSelectedDay(day)}
+            >
+              <Text style={[styles.dayButtonText, selectedDay === day && { color: 'white' }]}>Day {day}</Text>
+            </TouchableOpacity>
           ))}
-          <Droppable id="timeline">
-            <View style={styles.dropZone} />
-          </Droppable>
-        </View>
-      </ScrollView>
-      {/* Draggable panel for Saved Places at the bottom */}
-      <View style={styles.savedPlacesPanel}>
-        {trip.saved_places?.map(place => (
-          <Draggable key={place.fsq_id} id={place.fsq_id} data={{ place }}>
-            <View style={styles.savedPlaceChip}><Text>{place.name}</Text></View>
-          </Draggable>
-        ))}
+        </ScrollView>
       </View>
-    </DndContext>
+
+      {/* Timeline View */}
+      <ScrollView contentContainerStyle={styles.timelineContainer}>
+        {dayItinerary.length > 0 ? (
+          dayItinerary.map(item => (
+            <ItineraryItemCard
+              key={item.id}
+              item={item}
+              onPress={() => router.push({ pathname: '/edit-itinerary-item', params: { tripId: trip.id, item: JSON.stringify(item) } })}
+              onDelete={() => handleDelete(item)} // Pass the delete handler
+            />
+          ))
+        ) : (
+          <View style={styles.emptySceneContainer}>
+            <Text style={[styles.emptySceneText, { color: colors.textMuted[theme] }]}>No events scheduled for this day.</Text>
+          </View>
+        )}
+        <TouchableOpacity style={styles.addButton} onPress={() => handleAddItem(selectedDay, '09:00')}>
+          <Text style={styles.addButtonText}>+ Add Event to Day {selectedDay}</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
   );
 };
 
@@ -166,7 +150,7 @@ const BudgetRoute = ({ trip }) => {
 };
 
 export default function TripDetailScreen() {
-  const { theme } = useTheme();
+  const { theme, timeFormat, toggleTimeFormat } = useTheme(); // Get time format state
   const { id } = useLocalSearchParams();
   const { tripPlans } = useTripStore();
   const layout = useWindowDimensions();
@@ -199,8 +183,16 @@ export default function TripDetailScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background[theme] }}>
       {/* This is the spacious header block, rendered below the native header */}
       <View style={styles.tripHeader}>
-        <Text style={[styles.tripTitle, { color: colors.text[theme] }]}>{trip.name}</Text>
-        <Text style={[styles.tripSubtitle, { color: colors.textMuted[theme] }]}>{trip.destination}</Text>
+        <View>
+          <Text style={[styles.tripTitle, { color: colors.text[theme] }]}>{trip.name}</Text>
+          <Text style={[styles.tripSubtitle, { color: colors.textMuted[theme] }]}>{trip.destination}</Text>
+        </View>
+        {/* --- TIME FORMAT TOGGLE --- */}
+        <TouchableOpacity onPress={toggleTimeFormat} style={styles.timeFormatButton}>
+          <Text style={{ color: colors.primary[theme], fontWeight: 'bold' }}>
+            {timeFormat === '12h' ? '24H' : '12H'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <TabView
@@ -229,6 +221,15 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
     paddingHorizontal: 20,
     backgroundColor: 'transparent', // Ensures it uses the SafeAreaView's background
+    flexDirection: 'row', // Make header a row
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  timeFormatButton: {
+    padding: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#334155',
   },
   tripTitle: {
     fontSize: 32,
@@ -313,39 +314,24 @@ const styles = StyleSheet.create({
     marginTop: 24,
     paddingHorizontal: 16,
   },
+  daySelectorContainer: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#334155',
+  },
+  dayButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginRight: 8,
+    backgroundColor: '#334155',
+  },
+  dayButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
   timelineContainer: {
-    position: 'relative',
-    height: 24 * 60, // 24 hours * 60 pixels per hour
-  },
-  eventCard: {
-    position: 'absolute',
-    left: 60,
-    right: 10,
-    backgroundColor: 'lightblue',
-    borderRadius: 8,
-    padding: 8,
-  },
-  dropZone: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
-  savedPlacesPanel: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 120,
-    backgroundColor: 'lightgrey',
-    flexDirection: 'row',
-    padding: 8,
-  },
-  savedPlaceChip: {
-    backgroundColor: 'white',
-    padding: 8,
-    borderRadius: 16,
-    marginHorizontal: 4,
+    padding: 16,
   },
 });

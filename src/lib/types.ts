@@ -52,7 +52,7 @@ export interface ItineraryItem {
   day: number;
   startTime: string; // "09:00"
   endTime: string;   // "12:00"
-  type: 'attraction' | 'hotel' | 'restaurant' | 'travel';
+  type: 'attraction' | 'hotel' | 'restaurant' | 'travel' | 'default'; // <-- NEW 'default' TYPE
   place?: Place;
   travelDetails?: {
     from: string;
@@ -61,6 +61,8 @@ export interface ItineraryItem {
     estimatedDuration: number; // in minutes
   };
   notes?: string;
+  isDefault: boolean; // <-- NEW FLAG
+  defaultType?: 'breakfast' | 'lunch' | 'dinner' | 'sleep'; // <-- NEW PROPERTY
 }
 
 export interface TripPlan {

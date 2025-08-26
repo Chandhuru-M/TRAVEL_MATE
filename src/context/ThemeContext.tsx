@@ -4,17 +4,21 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme } from 'react-native';
 
 type Theme = 'light' | 'dark';
+type TimeFormat = '12h' | '24h'; // <-- NEW TYPE
 
 interface ThemeContextType {
   theme: Theme;
   toggleTheme: () => void;
+  timeFormat: TimeFormat; // <-- NEW STATE
+  toggleTimeFormat: () => void; // <-- NEW ACTION
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
-  const systemTheme = useColorScheme(); // Gets the phone's default theme
+  const systemTheme = useColorScheme();
   const [theme, setTheme] = useState<Theme>(systemTheme || 'light');
+  const [timeFormat, setTimeFormat] = useState<TimeFormat>('12h'); // Default to 12-hour
 
   // Load the saved theme from storage when the app starts
   useEffect(() => {
@@ -30,11 +34,15 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const toggleTheme = async () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
-    await AsyncStorage.setItem('theme', newTheme); // Save the new choice
+    await AsyncStorage.setItem('theme', newTheme);
+  };
+
+  const toggleTimeFormat = () => {
+    setTimeFormat(prev => prev === '12h' ? '24h' : '12h');
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, timeFormat, toggleTimeFormat }}>
       {children}
     </ThemeContext.Provider>
   );
