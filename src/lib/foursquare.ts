@@ -2,9 +2,10 @@ import axios from 'axios';
 import { Place } from './types';
 
 const API_KEY = process.env.EXPO_PUBLIC_FOURSQUARE_API_KEY || (process as any)?.env?.FOURSQUARE_API_KEY || process.env.NEXT_PUBLIC_FOURSQUARE_API_KEY;
-// Official v3 Places API endpoint (Authorization header must be the raw fsq3... token; no "Bearer")
 const BASE_URL = 'https://api.foursquare.com/v3/places/search';
 const API_VERSION = process.env.EXPO_PUBLIC_FOURSQUARE_API_VERSION || '2025-06-17';
+console.log('[FSQ] API_KEY loaded:', API_KEY ? 'YES' : 'NO');
+console.log('[FSQ] API_VERSION loaded:', API_VERSION);
 
 interface FetchPlacesParams {
   lat: number;
@@ -54,7 +55,7 @@ export async function fetchPlaces(params: FetchPlacesParams): Promise<Place[]> {
       photos: p.photos,
     })) as Place[];
   } catch (error:any) {
-    console.error('Failed to fetch from Foursquare:', error);
+    console.error('[FSQ] Failed to fetch from Foursquare:', error?.response?.data || error);
     throw error;
   }
 }
@@ -75,6 +76,7 @@ export async function searchPlacesBasic(params: { lat: number; lon: number; quer
     // Try to parse error body for details
     let details: any = undefined;
     try { details = await res.json(); } catch {}
+    console.error('[FSQ] searchPlacesBasic error', res.status, details);
     if (res.status === 429) throw new Error('FSQ_RATE_LIMIT');
     const msg = details?.message || details?.error || JSON.stringify(details || {});
     throw new Error(`Foursquare error ${res.status}${msg ? `: ${msg}` : ''}`);
@@ -119,6 +121,7 @@ export async function searchPlacesByParams(params: { lat: number; lon: number; q
   if (!res.ok) {
     let details: any = undefined;
     try { details = await res.json(); } catch {}
+    console.error('[FSQ] searchPlacesByParams error', res.status, details);
     if (res.status === 429) throw new Error('FSQ_RATE_LIMIT');
     const msg = details?.message || details?.error || JSON.stringify(details || {});
     throw new Error(`Foursquare error ${res.status}${msg ? `: ${msg}` : ''}`);

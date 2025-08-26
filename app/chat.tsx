@@ -24,9 +24,7 @@ function haversine(lat1:number, lon1:number, lat2:number, lon2:number) {
 
 export default function ChatScreen() {
   const { theme } = useTheme();
-  const [messages, setMessages] = useState<ChatMsg[]>([
-    { role: 'assistant', content: "Hello! I'm TravelMate AI. I can help find places, check weather, and plan trips. How can I help?" },
-  ]);
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [sessionId] = useState(`m-${Math.random().toString(36).slice(2, 10)}`);
@@ -108,7 +106,32 @@ export default function ChatScreen() {
           </Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <TouchableOpacity onPress={() => setAutoSpeak((v) => !v)} style={styles.topButton}>
+          <TouchableOpacity
+            onPress={() => {
+              setAutoSpeak((v) => {
+                const newVal = !v;
+                if (newVal) {
+                  // Speak the last assistant message if available
+                  const lastMsg = [...messages].reverse().find(m => m.role === 'assistant');
+                  if (lastMsg) {
+                    const text = lastMsg.content.replace(/[📍🎯🌤️⛅☁️🌧️⛈️🌩️❄️🌫️💨🔥💧⭐🏨🍽️⛽🚗🗺️👋]/gu, '').trim();
+                    setSpeaking(true);
+                    Speech.speak(text, {
+                      rate: 0.9,
+                      onDone: () => setSpeaking(false),
+                      onStopped: () => setSpeaking(false),
+                      onError: () => setSpeaking(false),
+                    });
+                  }
+                } else {
+                  Speech.stop();
+                  setSpeaking(false);
+                }
+                return newVal;
+              });
+            }}
+            style={styles.topButton}
+          >
             <Text style={{ color: autoSpeak ? '#16a34a' : colors.textMuted[theme] }}>🔊 {autoSpeak ? 'ON' : 'OFF'}</Text>
           </TouchableOpacity>
         </View>
@@ -130,17 +153,40 @@ export default function ChatScreen() {
             {msg.role === 'assistant' && msg.places && msg.places.length > 0 && (
               <View style={{ marginTop: 8, gap: 8 }}>
                 {msg.places.slice(0, 3).map((p) => (
-                  <TouchableOpacity key={p.id} style={styles.placeCard} onPress={() => openMaps(p)}>
+                  <View key={p.id} style={styles.placeCard}>
                     <Text style={[styles.placeTitle, { color: colors.text[theme] }]}>{p.name}</Text>
                     <Text style={[styles.placeSubtitle, { color: colors.textMuted[theme] }]} numberOfLines={2}>{p.address}</Text>
                     <Text style={[styles.placeMeta, { color: colors.textMuted[theme] }]}> 
                       {p.category || 'Place'}{p.rating ? ` • ⭐ ${p.rating}` : ''}{userLocation ? ` • ${(haversine(userLocation.lat, userLocation.lng, p.latitude, p.longitude)).toFixed(1)} km` : ''}
                     </Text>
-                    <View style={styles.directionsRow}>
-                      <FontAwesome name="map" size={16} color={colors.textMuted[theme]} />
-                      <Text style={[styles.directionsText, { color: colors.textMuted[theme] }]}>Open in Maps</Text>
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                      <TouchableOpacity
+                        style={[styles.primaryButton, { backgroundColor: '#2563eb', flex: 1 }]}
+                        onPress={() => {
+                          router.push({ pathname: '/directions' as any, params: { lat: p.latitude, lng: p.longitude, name: p.name, ulat: userLocation?.lat ?? '', ulng: userLocation?.lng ?? '' } });
+                        }}
+                      >
+                        <FontAwesome name="location-arrow" size={16} color="white" />
+                        <Text style={styles.primaryButtonText}>Get Directions</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.primaryButton, { backgroundColor: '#10b981', flex: 1 }]}
+                        onPress={() => {
+                          router.push({ pathname: '/live-navigation' as any, params: { lat: p.latitude, lng: p.longitude, name: p.name, profile: 'driving' } });
+                        }}
+                      >
+                        <FontAwesome name="map" size={16} color="white" />
+                        <Text style={styles.primaryButtonText}>View on Map</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.primaryButton, { backgroundColor: '#f59e42', flex: 1 }]}
+                        onPress={() => openMaps(p)}
+                      >
+                        <FontAwesome name="external-link" size={16} color="white" />
+                        <Text style={styles.primaryButtonText}>Google Maps</Text>
+                      </TouchableOpacity>
                     </View>
-                  </TouchableOpacity>
+                  </View>
                 ))}
                 <View style={{ flexDirection:'row', gap:8 }}>
                   <TouchableOpacity
@@ -190,8 +236,6 @@ export default function ChatScreen() {
           <TouchableOpacity
             style={styles.iconButton}
             onPress={() => {
-              // Simple Android voice: open Google voice typing via intent is non-trivial here; keep as placeholder UI
-              // Users can enable autoSpeak to hear responses.
               setListening((l) => !l);
             }}
           >

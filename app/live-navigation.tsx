@@ -22,52 +22,54 @@ export default function LiveNavigation() {
   const token = (process as any)?.env?.EXPO_PUBLIC_MAPBOX_TOKEN
 
   useEffect(() => {
-    let watchSub: Location.LocationSubscription | null = null
-    let nextStep = 0
-    const dist = (a: LatLng, b: LatLng) => {
-      const toRad = (d:number)=> d*Math.PI/180
-      const R = 6371e3
-      const dLat = toRad(b.lat-a.lat)
-      const dLon = toRad(b.lng-a.lng)
-      const x = Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLon/2)**2
-      return 2*R*Math.atan2(Math.sqrt(x), Math.sqrt(1-x))
-    }
-    ;(async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync()
-      if (status !== 'granted') return
-      const loc = await Location.getCurrentPositionAsync({})
-      const me = { lat: loc.coords.latitude, lng: loc.coords.longitude }
-      setUser(me)
-      try {
-        const r = await getBestRoute(me, { lat: destLat, lng: destLng }, profile)
-        setRoute(r)
-        Speech.speak(`Starting ${profile} navigation to ${destName}. ${Math.round(r.distance_m/1000)} kilometers, about ${Math.round(r.duration_s/60)} minutes.`)
-      } catch {}
-      watchSub = await Location.watchPositionAsync({ accuracy: Location.Accuracy.High, distanceInterval: 5 }, (p) => {
-        const me2 = { lat: p.coords.latitude, lng: p.coords.longitude }
-        setUser(me2)
-        // Push location updates to WebView for marker move
-        webRef.current?.postMessage(JSON.stringify({ type: 'user-location', payload: me2 }))
-        // Simple turn-by-turn: speak next step when within ~40m of its maneuver point
-        if (route?.steps?.length) {
-          const steps = route.steps
-          if (nextStep < steps.length && steps[nextStep]?.maneuver?.location) {
-            const [lng, lat] = steps[nextStep].maneuver!.location
-            const d = dist(me2, { lat, lng })
-            if (d < 40) {
-              const instr = steps[nextStep].maneuver?.instruction || steps[nextStep].instruction
-              if (instr) Speech.speak(instr, { rate: 1.0 })
-              nextStep += 1
-            }
-          }
+      if (Platform.OS !== 'web') {
+        let watchSub: Location.LocationSubscription | null = null
+        let nextStep = 0
+        const dist = (a: LatLng, b: LatLng) => {
+          const toRad = (d:number)=> d*Math.PI/180
+          const R = 6371e3
+          const dLat = toRad(b.lat-a.lat)
+          const dLon = toRad(b.lng-a.lng)
+          const x = Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLon/2)**2
+          return 2*R*Math.atan2(Math.sqrt(x), Math.sqrt(1-x))
         }
-      })
-    })()
-    return () => {
-      Speech.stop()
-      watchSub?.remove()
-    }
-  }, [destLat, destLng, profile])
+        ;(async () => {
+          const { status } = await Location.requestForegroundPermissionsAsync()
+          if (status !== 'granted') return
+          const loc = await Location.getCurrentPositionAsync({})
+          const me = { lat: loc.coords.latitude, lng: loc.coords.longitude }
+          setUser(me)
+          try {
+            const r = await getBestRoute(me, { lat: destLat, lng: destLng }, profile)
+            setRoute(r)
+            Speech.speak(`Starting ${profile} navigation to ${destName}. ${Math.round(r.distance_m/1000)} kilometers, about ${Math.round(r.duration_s/60)} minutes.`)
+          } catch {}
+          watchSub = await Location.watchPositionAsync({ accuracy: Location.Accuracy.High, distanceInterval: 5 }, (p) => {
+            const me2 = { lat: p.coords.latitude, lng: p.coords.longitude }
+            setUser(me2)
+            // Push location updates to WebView for marker move
+            webRef.current?.postMessage(JSON.stringify({ type: 'user-location', payload: me2 }))
+            // Simple turn-by-turn: speak next step when within ~40m of its maneuver point
+            if (route?.steps?.length) {
+              const steps = route.steps
+              if (nextStep < steps.length && steps[nextStep]?.maneuver?.location) {
+                const [lng, lat] = steps[nextStep].maneuver!.location
+                const d = dist(me2, { lat, lng })
+                if (d < 40) {
+                  const instr = steps[nextStep].maneuver?.instruction || steps[nextStep].instruction
+                  if (instr) Speech.speak(instr, { rate: 1.0 })
+                  nextStep += 1
+                }
+              }
+            }
+          })
+        })()
+        return () => {
+          Speech.stop()
+          watchSub?.remove()
+        }
+      }
+    }, [destLat, destLng, profile])
 
   const html = useMemo(() => {
     if (!token) return '<html><body><p style="font-family:sans-serif">Missing EXPO_PUBLIC_MAPBOX_TOKEN</p></body></html>'

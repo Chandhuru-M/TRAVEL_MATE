@@ -1,8 +1,4 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Linking, ActivityIndicator, ScrollView, Platform } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import * as Speech from 'expo-speech';
-import { getBestRoute, summarizeForSpeech, type RouteSummary } from '@/services/directions';
+import { colors } from '@/constants/Colors';
 // Avoid importing WebView on native to prevent RNCWebView missing module in Expo Go
 const WebView: any = Platform.OS === 'web' ? require('react-native-webview').WebView : null;
 
@@ -51,13 +47,13 @@ export default function Directions() {
     Linking.openURL(url).catch(() => {});
   };
   return (
-    <View style={styles.container}>
-      <View style={styles.fallback}>
-        <Text style={styles.fallbackTitle}>Directions</Text>
+    <View style={[styles.container, { backgroundColor: colors.background.light }]}> 
+      <View style={[styles.fallback, { backgroundColor: colors.card.light, borderRadius: 16, margin: 16, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } }]}> 
+        <Text style={[styles.fallbackTitle, { color: colors.text.light }]}>Directions</Text>
         {loading && (
           <View style={{ alignItems: 'center' }}>
-            <ActivityIndicator />
-            <Text style={styles.fallbackText}>Fetching route…</Text>
+            <ActivityIndicator color={colors.primary.light} />
+            <Text style={[styles.fallbackText, { color: colors.textMuted.light }]}>Fetching route…</Text>
           </View>
         )}
         {!loading && error && (
@@ -66,7 +62,7 @@ export default function Directions() {
         {!loading && !error && summary && (
           <>
             {Platform.OS === 'web' && process.env.EXPO_PUBLIC_MAPBOX_TOKEN && summary.geometry && WebView ? (
-              <View style={{ height: 220, width: '100%', borderRadius: 12, overflow: 'hidden', marginBottom: 8 }}>
+              <View style={{ height: 220, width: '100%', borderRadius: 12, overflow: 'hidden', marginBottom: 8, borderWidth: 1, borderColor: colors.border.light }}>
                 <WebView
                   style={{ flex: 1 }}
                   originWhitelist={["*"]}
@@ -75,27 +71,27 @@ export default function Directions() {
               </View>
             ) : null}
             <ScrollView style={{ maxHeight: 260 }} contentContainerStyle={{ paddingVertical: 6 }}>
-              <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 6 }}>Route summary</Text>
-              <Text style={{ fontSize: 13, color: '#374151', marginBottom: 8 }}>
+              <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 6, color: colors.text.light }}>Route Summary</Text>
+              <Text style={{ fontSize: 13, color: colors.textMuted.light, marginBottom: 8 }}>
                 Distance: {(summary.distance_m/1000).toFixed(1)} km • Time: {Math.round(summary.duration_s/60)} min
               </Text>
               {summary.steps.slice(0, 10).map((s, i) => (
-                <Text key={i} style={{ fontSize: 13, color: '#374151', marginBottom: 4 }}>{i+1}. {s.instruction}</Text>
+                <Text key={i} style={{ fontSize: 13, color: colors.text.light, marginBottom: 4 }}>{i+1}. {s.instruction}</Text>
               ))}
             </ScrollView>
           </>
         )}
       </View>
-      <View style={styles.footer}>
-        <Text style={styles.title} numberOfLines={1}>Directions to {destName}</Text>
+      <View style={[styles.footer, { backgroundColor: colors.card.light, borderTopColor: colors.border.light }]}> 
+        <Text style={[styles.title, { color: colors.text.light }]}>Directions to {destName}</Text>
         <View style={styles.actions}>
-          <TouchableOpacity onPress={() => router.back()} style={[styles.button, { backgroundColor: '#e5e7eb' }]}> 
-            <Text style={[styles.buttonText, { color: '#111827' }]}>Close</Text>
+          <TouchableOpacity onPress={() => router.back()} style={[styles.button, { backgroundColor: colors.border.light }]}> 
+            <Text style={[styles.buttonText, { color: colors.text.light }]}>Close</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push({ pathname: '/live-navigation' as any, params: { lat: destLat, lng: destLng, name: destName, profile: 'walking' } })} style={[styles.button, { backgroundColor: '#10b981' }]}> 
             <Text style={[styles.buttonText, { color: 'white' }]}>Start Live Nav</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={openInMaps} style={[styles.button, { backgroundColor: '#2563eb' }]}> 
+          <TouchableOpacity onPress={openInMaps} style={[styles.button, { backgroundColor: colors.primary.light }]}> 
             <Text style={[styles.buttonText, { color: 'white' }]}>Open in Google Maps</Text>
           </TouchableOpacity>
         </View>
@@ -140,8 +136,8 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   fallback: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 },
   fallbackTitle: { fontSize: 18, fontWeight: '600', marginBottom: 8 },
-  fallbackText: { fontSize: 14, color: '#6b7280', textAlign: 'center' },
-  footer: { padding: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#e5e7eb', backgroundColor: 'white' },
+  fallbackText: { fontSize: 14, textAlign: 'center' },
+  footer: { padding: 12, borderTopWidth: StyleSheet.hairlineWidth },
   title: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
   actions: { flexDirection: 'row', gap: 8 },
   button: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10 },
