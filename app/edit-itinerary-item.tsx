@@ -15,9 +15,10 @@ export default function EditItineraryItemScreen() {
   const tripId = params.tripId as string;
   const day = parseInt(params.day as string);
   const existingItem = params.item ? JSON.parse(params.item as string) : null;
+  const prefilledStartTime = params.startTime as string;
 
   const [title, setTitle] = useState(existingItem?.place?.name || '');
-  const [startTime, setStartTime] = useState(existingItem?.startTime || '10:00');
+  const [startTime, setStartTime] = useState(existingItem?.startTime || prefilledStartTime || '10:00');
   const [endTime, setEndTime] = useState(existingItem?.endTime || '11:00');
   const [notes, setNotes] = useState(existingItem?.notes || '');
 
@@ -45,14 +46,16 @@ export default function EditItineraryItemScreen() {
         categories: [{ name: 'Custom Event' }], // Provide a default category
       };
 
+      // --- FIX: Ensure all required properties are passed ---
       await addItineraryItem(tripId, {
         day,
         startTime,
         endTime,
         notes,
-        place: newPlace, // Pass the full, valid Place object
+        place: newPlace,
+        isDefault: false, // This is required
       });
-      // -----------------------
+      // --- END OF FIX ---
     }
     router.back();
   };
