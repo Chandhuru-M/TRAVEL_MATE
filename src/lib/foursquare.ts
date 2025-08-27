@@ -3,6 +3,7 @@ import { Place } from './types';
 
 const API_KEY = process.env.EXPO_PUBLIC_FOURSQUARE_API_KEY;
 const BASE_URL = 'https://places-api.foursquare.com/places/search';
+const API_VERSION = '2025-06-17';
 
 interface FetchPlacesParams {
   lat: number;

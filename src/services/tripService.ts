@@ -54,6 +54,7 @@ const _recalculateAndFormatDayItinerary = (dayItinerary: ItineraryItem[]): Itine
 /**
  * The complete and correct interface for our trip management store.
  */
+// --- THIS IS THE FIX: The complete and correct interface ---
 interface TripState {
   isLoaded: boolean;
   tripPlans: TripPlan[];
@@ -67,7 +68,11 @@ interface TripState {
   updateItineraryItem: (tripId: string, updatedItem: ItineraryItem) => Promise<void>;
   deleteItineraryItem: (tripId: string, itemId: string) => Promise<void>;
   deleteTripPlan: (tripId: string) => Promise<void>;
+  // Re-add the missing function definition
+  moveSavedPlaceToItinerary: (tripId: string, day: number, place: Place, durationInMinutes: number) => Promise<{ success: boolean; error?: string }>;
+
 }
+// --- END OF FIX ---
 
 export const useTripStore = create<TripState>((set, get) => ({
   isLoaded: false,
@@ -227,5 +232,54 @@ export const useTripStore = create<TripState>((set, get) => ({
       tripPlans: state.tripPlans.filter(p => p.id !== tripId),
       activeTripPlanId: state.activeTripPlanId === tripId ? null : state.activeTripPlanId,
     }));
+  },
+
+  // --- IMPLEMENTATION FOR THE MISSING FUNCTION ---
+  moveSavedPlaceToItinerary: async (tripId, day, place, durationInMinutes) => {
+    const trip = get().tripPlans.find(p => p.id === tripId);
+    if (!trip) return { success: false, error: "Trip not found." };
+
+    // 1. Create the new itinerary item from the place
+    const dayItinerary = (trip.itinerary || []).filter(item => item.day === day).sort((a, b) => a.startTime.localeCompare(b.startTime));
+    const lastItem = dayItinerary[dayItinerary.length - 1];
+    let newEventStartTime: Date;
+    if (lastItem) {
+      newEventStartTime = addMinutes(parse(lastItem.endTime, 'HH:mm', new Date()), 30);
+    } else {
+      newEventStartTime = parse('09:00', 'HH:mm', new Date());
+    }
+    const newEventEndTime = addMinutes(newEventStartTime, durationInMinutes);
+    const newItineraryItem: ItineraryItem = {
+      id: uuid.v4() as string,
+      day,
+      startTime: format(newEventStartTime, 'HH:mm'),
+      endTime: format(newEventEndTime, 'HH:mm'),
+      type: 'attraction',
+      place: place,
+      isDefault: false, // Items from saved places are not default
+    };
+    
+    // 2. Add the new item and recalculate the day's schedule
+    const newDayItinerary = [...dayItinerary, newItineraryItem];
+    const otherDaysItinerary = (trip.itinerary || []).filter(i => i.day !== day);
+    const newFullItinerary = [...otherDaysItinerary, ..._recalculateAndFormatDayItinerary(newDayItinerary)];
+    
+    // 3. Remove the place from the saved list
+    const updatedSavedPlaces = trip.saved_places.filter(p => p.fsq_id !== place.fsq_id);
+
+    // 4. Update the database with both changes
+    const { error } = await supabase.from('trip_plans').update({ itinerary: newFullItinerary, saved_places: updatedSavedPlaces }).eq('id', tripId);
+    if (error) {
+      console.error("Error moving saved place:", error);
+      return { success: false, error: error.message };
+    }
+
+    // 5. Update local state
+    set(state => ({
+      tripPlans: state.tripPlans.map(p =>
+        p.id === tripId ? { ...p, itinerary: newFullItinerary, saved_places: updatedSavedPlaces } : p
+      )
+    }));
+    return { success: true };
   },
 }));

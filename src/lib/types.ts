@@ -65,13 +65,31 @@ export interface ItineraryItem {
   defaultType?: 'breakfast' | 'lunch' | 'dinner' | 'sleep'; // <-- NEW PROPERTY
 }
 
+// A new type for a single budget item
+export interface BudgetItem {
+  id: string;
+  day: number; // Which day of the trip this budget is for
+  category: 'Food' | 'Accommodation' | 'Transport' | 'Activities' | 'Other';
+  description: string; // e.g., "Museum Tickets", "Dinner at Le Relais"
+  plannedAmount: number; // The amount the user plans to spend
+}
+
+// The enhanced budget object
+export interface TripBudget {
+  totalAmount: number;
+  spentAmount: number;
+  currency: string;
+  // The new detailed breakdown
+  items: BudgetItem[];
+}
+
 export interface TripPlan {
   id: string;
   user_id: string;
   name: string;
   destination: string;
   dates: { start: string; end: string; };
-  budget: { totalAmount: number; spentAmount: number; currency: string; };
+  budget: TripBudget; // Use the new, more detailed budget type
   itinerary: ItineraryItem[];
   saved_places: Place[];
   status: 'planning' | 'active' | 'completed';
