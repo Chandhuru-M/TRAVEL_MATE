@@ -1,14 +1,15 @@
 // app/(tabs)/home.tsx
-import React, { useMemo, useState } from 'react';
-import { StyleSheet, View, Text, SafeAreaView, ScrollView, FlatList, TextInput, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { StyleSheet, View, Text, SafeAreaView, ScrollView, FlatList, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import PlaceCard from '@/components/PlaceCard';
 import CustomHeader from '@/components/CustomHeader';
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import { FontAwesome } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { mockPlaces } from '@/lib/mock-data'; // 1. Import the mock data
+import { fetchPlaces } from '@/lib/foursquare'; // 1. Import the real API fetch function
 import { Place } from '@/lib/types';
+import * as Location from 'expo-location'; // 2. Import the location library
 import { useTripStore } from '@/services/tripService';
 import SelectActiveTripModal from '@/components/SelectActiveTripModal';
 
@@ -72,10 +73,53 @@ const ActiveTripBanner = () => {
 
 export default function HomeScreen() {
   const { theme } = useTheme();
+  // 3. Re-introduce state for places, loading, and errors
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // 2. Directly use the imported mockPlaces. No loading, error, or useEffect needed.
-  const places = mockPlaces;
+  // 4. Re-introduce the useEffect hook for fetching live data
+  useEffect(() => {
+    const loadLocationAndPlaces = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          setError('Permission to access location was denied. Please enable it in your settings to see nearby places.');
+          setLoading(false);
+          return;
+        }
+        let location = await Location.getCurrentPositionAsync({});
+        const { latitude, longitude } = location.coords;
+        const fetchedPlaces = await fetchPlaces({ lat: latitude, lon: longitude });
+        setPlaces(fetchedPlaces);
+      } catch (e) {
+        setError("Failed to load places. Please check your internet connection.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadLocationAndPlaces();
+  }, []);
+
   const reversedPlaces = useMemo(() => [...places].reverse(), [places]);
+
+  // 5. Create a helper to render content based on the loading/error state
+  const renderContent = () => {
+    if (loading) {
+      return <ActivityIndicator size="large" color={colors.primary[theme]} style={{ marginTop: 50 }} />;
+    }
+    if (error) {
+      return <Text style={styles.errorText}>{error}</Text>;
+    }
+    return (
+      <>
+        <CategoryCarousel title="Popular Near You" places={places} />
+        <CategoryCarousel title="Top-Rated Restaurants" places={reversedPlaces} />
+      </>
+    );
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background[theme] }}>
@@ -96,9 +140,7 @@ export default function HomeScreen() {
 
           <ActiveTripBanner />
 
-          {/* 3. Render the carousels directly with the mock data */}
-          <CategoryCarousel title="Popular Near You" places={places} />
-          <CategoryCarousel title="Top-Rated Restaurants" places={reversedPlaces} />
+          {renderContent()}
 
           <TouchableOpacity onPress={() => router.push('/(tabs)/trip-planner' as any)}>
             <View style={[styles.ctaCard, { backgroundColor: colors.card[theme] }]}>
@@ -136,4 +178,5 @@ const styles = StyleSheet.create({
   ctaTextContainer: { flex: 1, marginLeft: 16 },
   ctaTitle: { fontSize: 18, fontWeight: 'bold' },
   ctaSubtitle: { fontSize: 14, marginTop: 4 },
+  errorText: { color: '#ef4444', textAlign: 'center', marginTop: 50, fontSize: 16, paddingHorizontal: 16 },
 });

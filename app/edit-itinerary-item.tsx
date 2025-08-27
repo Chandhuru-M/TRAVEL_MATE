@@ -1,63 +1,78 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, Alert, Platform } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import { useTripStore } from '@/services/tripService';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Place } from '@/lib/types'; // Import the Place type
+import { Place } from '@/lib/types';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { format, parse } from 'date-fns';
 
 export default function EditItineraryItemScreen() {
   const { theme } = useTheme();
   const params = useLocalSearchParams();
   const { addItineraryItem, updateItineraryItem } = useTripStore.getState();
   
-  // Params will include tripId, day, and an optional 'item' if we are editing
   const tripId = params.tripId as string;
   const day = parseInt(params.day as string);
   const existingItem = params.item ? JSON.parse(params.item as string) : null;
   const prefilledStartTime = params.startTime as string;
 
   const [title, setTitle] = useState(existingItem?.place?.name || '');
-  const [startTime, setStartTime] = useState(existingItem?.startTime || prefilledStartTime || '10:00');
-  const [endTime, setEndTime] = useState(existingItem?.endTime || '11:00');
+
+  const [startTime, setStartTime] = useState(parse(existingItem?.startTime || prefilledStartTime || '10:00', 'HH:mm', new Date()));
+  const [endTime, setEndTime] = useState(parse(existingItem?.endTime || '11:00', 'HH:mm', new Date()));
   const [notes, setNotes] = useState(existingItem?.notes || '');
+  const [showPicker, setShowPicker] = useState<'start' | 'end' | null>(null);
 
   const handleSave = async () => {
-    if (!title || !startTime || !endTime) {
-      Alert.alert("Missing Info", "Please provide a title and start/end times.");
+    if (!title) {
+      Alert.alert("Missing Info", "Please provide an event title.");
+      return;
+    }
+    // Ensure end time is after start time
+    if (startTime >= endTime) {
+      Alert.alert("Invalid Time", "End time must be after the start time.");
       return;
     }
 
+    const formattedStartTime = format(startTime, 'HH:mm');
+    const formattedEndTime = format(endTime, 'HH:mm');
+
     if (existingItem) {
-      // Update the existing item's place name
       await updateItineraryItem(tripId, {
         ...existingItem,
-        startTime,
-        endTime,
+        startTime: formattedStartTime,
+        endTime: formattedEndTime,
         notes,
         place: { ...existingItem.place, name: title },
       });
     } else {
-      // --- THIS IS THE FIX ---
-      // Create a new, valid "dummy" Place object for the manual entry
       const newPlace: Place = {
-        fsq_id: `manual_${Date.now()}`, // Create a unique ID
+        fsq_id: `manual_${Date.now()}`,
         name: title,
-        categories: [{ name: 'Custom Event' }], // Provide a default category
+        categories: [{ name: 'Custom Event' }],
       };
-
-      // --- FIX: Ensure all required properties are passed ---
       await addItineraryItem(tripId, {
         day,
-        startTime,
-        endTime,
+        startTime: formattedStartTime,
+        endTime: formattedEndTime,
         notes,
         place: newPlace,
-        isDefault: false, // This is required
+        isDefault: false,
       });
-      // --- END OF FIX ---
     }
     router.back();
+  };
+  
+  const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    const currentDate = selectedDate || (showPicker === 'start' ? startTime : endTime);
+    setShowPicker(null);
+    if (showPicker === 'start') {
+      setStartTime(currentDate);
+    } else {
+      setEndTime(currentDate);
+    }
   };
 
   const dynamicStyles = {
@@ -82,26 +97,27 @@ export default function EditItineraryItemScreen() {
         
         <View style={{flexDirection: 'row', gap: 16}}>
           <View style={{flex: 1}}>
-            <Text style={[styles.label, { color: colors.text[theme] }]}>Start Time (HH:mm)</Text>
-            <TextInput 
-              style={[styles.input, dynamicStyles.input]} 
-              value={startTime} 
-              onChangeText={setStartTime}
-              placeholder="10:00"
-              placeholderTextColor={colors.textMuted[theme]}
-            />
+            <Text style={[styles.label, { color: colors.text[theme] }]}>Start Time</Text>
+            <TouchableOpacity style={[styles.input, styles.timePickerButton, dynamicStyles.input]} onPress={() => setShowPicker('start')}>
+              <Text style={{ color: colors.text[theme], fontSize: 16 }}>{format(startTime, 'h:mm a')}</Text>
+            </TouchableOpacity>
           </View>
           <View style={{flex: 1}}>
-            <Text style={[styles.label, { color: colors.text[theme] }]}>End Time (HH:mm)</Text>
-            <TextInput 
-              style={[styles.input, dynamicStyles.input]} 
-              value={endTime} 
-              onChangeText={setEndTime}
-              placeholder="11:00"
-              placeholderTextColor={colors.textMuted[theme]}
-            />
+            <Text style={[styles.label, { color: colors.text[theme] }]}>End Time</Text>
+            <TouchableOpacity style={[styles.input, styles.timePickerButton, dynamicStyles.input]} onPress={() => setShowPicker('end')}>
+              <Text style={{ color: colors.text[theme], fontSize: 16 }}>{format(endTime, 'h:mm a')}</Text>
+            </TouchableOpacity>
           </View>
         </View>
+
+        {showPicker && (
+          <DateTimePicker
+            value={showPicker === 'start' ? startTime : endTime}
+            mode="time"
+            display="default"
+            onChange={onDateChange}
+          />
+        )}
 
         <Text style={[styles.label, { color: colors.text[theme] }]}>Notes (Optional)</Text>
         <TextInput 
@@ -140,6 +156,9 @@ const styles = StyleSheet.create({
     fontSize: 16, 
     marginBottom: 20, 
     borderWidth: 1 
+  },
+  timePickerButton: { 
+    justifyContent: 'center' 
   },
   textArea: { 
     height: 80, 
