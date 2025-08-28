@@ -1,6 +1,7 @@
 // app/(tabs)/home.tsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { StyleSheet, View, Text, SafeAreaView, ScrollView, FlatList, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { StyleSheet, View, Text, SafeAreaView, ScrollView, FlatList, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import PlaceCard from '@/components/PlaceCard';
 import CustomHeader from '@/components/CustomHeader';
 import { useTheme } from '@/context/ThemeContext';
@@ -75,52 +76,85 @@ export default function HomeScreen() {
   const { theme } = useTheme();
   const [places, setPlaces] = useState<Place[]>([]);
   const [restaurants, setRestaurants] = useState<Place[]>([]);
+  const [hotels, setHotels] = useState<Place[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const testQueries = [
-    'popular places',
-    'restaurant',
-    'cafe',
-    'supermarket',
-    'hotel',
-    'petrol station',
-    'pharmacy',
-  ];
-  const [selectedQuery, setSelectedQuery] = useState<string>(testQueries[0]);
+  const HOTELS_KEY = 'hotels_cache_v1';
+  const [searchText, setSearchText] = useState<string>('');
 
   // This useEffect hook now handles location permissions and fetches live data
   useEffect(() => {
-    const loadLocationAndPlaces = async () => {
+    const HOTELS_KEY = 'hotels_cache_v1';
+
+    const loadCachedHotels = async () => {
       try {
-        setLoading(true);
-        setError(null);
+        const raw = await AsyncStorage.getItem(HOTELS_KEY);
+        if (raw) {
+          const parsed: Place[] = JSON.parse(raw);
+          setHotels(parsed);
+        }
+      } catch (e) {
+        console.warn('Failed to load cached hotels:', e);
+      }
+    };
 
-        // Simplify: use the centralized helper which requests permission and location
-        try {
-          // Get device coordinates explicitly
-          const { latitude, longitude } = await getDeviceLocation();
-          console.log('[Home] device coords', { latitude, longitude });
+    const cacheHotels = async (items: Place[]) => {
+      try {
+        await AsyncStorage.setItem(HOTELS_KEY, JSON.stringify(items || []));
+      } catch (e) {
+        console.warn('Failed to cache hotels:', e);
+      }
+    };
 
-          // Fetch two separate queries and merge into state variables
-          const popular = await fetchPlaces({ lat: latitude, lon: longitude, query: 'popular places', limit: 12 });
-          const restaurants = await fetchPlaces({ lat: latitude, lon: longitude, query: 'restaurant', limit: 12 });
+    const tryFetchWithFallback = async (latitude: number, longitude: number, initialQuery: string) => {
+      // try increasing radius and fallback queries
+      const radii = [5000, 10000, 20000];
+      const fallbackQueries = [initialQuery, 'popular places', 'food'];
 
-          // Prefer showing popular in the first carousel and restaurants in the second
-          setPlaces(popular);
-          // stash restaurants in a temporary state by attaching to a ref? Simpler: setPlaces to popular and
-          // keep restaurants in a local variable to reverse for second carousel
-          // We'll set a small local state for restaurants
-          setRestaurants(restaurants);
-        } catch (locErr: any) {
-          console.error('places fetch error:', locErr);
-          setError(typeof locErr === 'string' ? locErr : locErr.message || 'Current location is unavailable.');
-          setLoading(false);
-          return;
+      for (const q of fallbackQueries) {
+        for (const r of radii) {
+          try {
+            const res = await fetchPlaces({ lat: latitude, lon: longitude, query: q, radius: r, limit: 20 });
+            if (res && res.length > 0) return res;
+          } catch (e) {
+            console.warn('fetchPlaces attempt failed', q, r, e);
+            // continue to next
+          }
+        }
+      }
+      return [] as Place[];
+    };
+
+    const loadLocationAndPlaces = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        // load cached hotels first so UI is not empty on reload
+        await loadCachedHotels();
+
+        // get coords
+        const { latitude, longitude } = await getDeviceLocation();
+        console.log('[Home] device coords', { latitude, longitude });
+
+        // Fetch hotels (persistent): try fallback strategy
+        const fetchedHotels = await tryFetchWithFallback(latitude, longitude, 'hotel');
+        if (fetchedHotels.length > 0) {
+          setHotels(fetchedHotels);
+          cacheHotels(fetchedHotels);
         }
 
-      } catch (e) {
-        setError("Failed to load places. Please check your connection and location services.");
-        console.error(e);
+        // Fetch popular places (use fallback)
+        const fetchedPopular = await tryFetchWithFallback(latitude, longitude, 'popular places');
+        setPlaces(fetchedPopular);
+
+        // Fetch restaurants specifically
+        const fetchedRestaurants = await tryFetchWithFallback(latitude, longitude, 'restaurant');
+        setRestaurants(fetchedRestaurants);
+
+      } catch (locErr: any) {
+        console.error('places fetch error:', locErr);
+        setError(typeof locErr === 'string' ? locErr : locErr.message || 'Current location is unavailable.');
       } finally {
         setLoading(false);
       }
@@ -132,20 +166,60 @@ export default function HomeScreen() {
   const reversedPlaces = useMemo(() => [...places].reverse(), [places]);
   const reversedRestaurants = useMemo(() => [...restaurants].reverse(), [restaurants]);
 
+  const performSearch = async (query: string) => {
+    if (!query || query.trim().length === 0) {
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const { latitude, longitude } = await getDeviceLocation();
+      // try a few radii for robustness
+      const fetched = await fetchPlacesNearby({ query, radius: 10000, limit: 20 });
+      setPlaces(fetched);
+
+      // If search is hotels or first result looks like hotel, cache as hotels
+      if (query.toLowerCase().includes('hotel') || (fetched && fetched.length > 0 && fetched[0].categories?.some(c => c.name?.toLowerCase().includes('hotel')))) {
+        setHotels(fetched);
+        try {
+          await AsyncStorage.setItem(HOTELS_KEY, JSON.stringify(fetched || []));
+        } catch (e) {
+          console.warn('Failed to cache hotels on search', e);
+        }
+      }
+
+      // Also fetch restaurants to populate the restaurants carousel
+      const fetchedRestaurants = await fetchPlacesNearby({ query: 'restaurant', radius: 10000, limit: 20 });
+      setRestaurants(fetchedRestaurants);
+    } catch (e: any) {
+      console.error('performSearch error', e);
+      setError(typeof e === 'string' ? e : e?.message || 'Search failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderContent = () => {
-    if (loading) {
-      return <ActivityIndicator size="large" color={colors.primary[theme]} style={{ marginTop: 50 }} />;
-    }
-    if (error) {
-      return <Text style={styles.errorText}>{error}</Text>;
-    }
-    if (places.length === 0) {
-        return <Text style={[styles.errorText, {color: colors.textMuted[theme]}]}>No places found nearby.</Text>
-    }
+    // Always show cached hotels immediately if available
+    const showHotels = hotels && hotels.length > 0;
+
     return (
       <>
-        <CategoryCarousel title="Popular Near You" places={places} />
-        <CategoryCarousel title="Top-Rated Restaurants" places={reversedRestaurants} />
+        {showHotels && <CategoryCarousel title="Hotels Near You" places={hotels} />}
+
+        {loading ? (
+          <ActivityIndicator size="large" color={colors.primary[theme]} style={{ marginTop: 24 }} />
+        ) : error ? (
+          <Text style={styles.errorText}>{error}</Text>
+        ) : places && places.length > 0 ? (
+          <>
+            <CategoryCarousel title="Popular Near You" places={places} />
+            <CategoryCarousel title="Top-Rated Restaurants" places={reversedRestaurants} />
+          </>
+        ) : (
+          // no places found but hotels may still be visible above
+          <Text style={[styles.errorText, { color: colors.textMuted[theme] }]}>No places found nearby.</Text>
+        )}
       </>
     );
   };
@@ -163,60 +237,29 @@ export default function HomeScreen() {
                 placeholder="Search for a destination..."
                 placeholderTextColor={colors.textMuted[theme]}
                 style={[styles.searchInput, { color: colors.text[theme] }]}
+                value={searchText}
+                onChangeText={setSearchText}
+                returnKeyType="search"
+                onSubmitEditing={async () => {
+                  // perform search when user presses enter on keyboard
+                  await performSearch(searchText);
+                }}
               />
-            </View>
-          </View>
-
-          {__DEV__ && (
-            <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
-              <Text style={{ marginBottom: 8, color: colors.textMuted[theme] }}>Dev: pick a query</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {testQueries.map((q) => (
-                  <TouchableOpacity
-                    key={q}
-                    onPress={() => setSelectedQuery(q)}
-                    style={{
-                      paddingVertical: 6,
-                      paddingHorizontal: 10,
-                      borderRadius: 20,
-                      marginRight: 8,
-                      marginBottom: 8,
-                      backgroundColor: selectedQuery === q ? colors.primary[theme] : colors.card[theme],
-                    }}
-                  >
-                    <Text style={{ color: selectedQuery === q ? '#fff' : colors.text[theme] }}>{q}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
 
               <TouchableOpacity
                 onPress={async () => {
-                  console.log('[DevTest] Run pressed, selectedQuery=', selectedQuery);
-                  Alert.alert('Dev Run', `Query: ${selectedQuery}`);
-                  setLoading(true);
-                  setError(null);
-                  try {
-                    const fetched = await fetchPlacesNearby({ query: selectedQuery, radius: 10000, limit: 20 });
-                    console.log('[DevTest] fetched places count', fetched.length);
-                    setPlaces(fetched);
-                    const fetchedRestaurants = await fetchPlacesNearby({ query: 'restaurant', radius: 10000, limit: 20 });
-                    setRestaurants(fetchedRestaurants);
-                  } catch (e) {
-                    console.error(e);
-                    setError('Dev test fetch failed');
-                  } finally {
-                    setLoading(false);
-                  }
+                  await performSearch(searchText);
                 }}
-                activeOpacity={0.8}
+                style={[styles.searchButton, { backgroundColor: colors.primary[theme] }]}
                 accessibilityRole="button"
-                accessibilityLabel="Run dev query"
-                style={{ backgroundColor: colors.card[theme], padding: 10, borderRadius: 8, marginTop: 8 }}
+                accessibilityLabel="Search"
               >
-                <Text style={{ color: colors.primary[theme], textAlign: 'center', fontWeight: '600' }}>Run</Text>
+                <Text style={{ color: '#fff', fontWeight: '600' }}>Search</Text>
               </TouchableOpacity>
             </View>
-          )}
+          </View>
+
+          {/* Developer options removed - search is in the search bar */}
 
           <ActiveTripBanner />
 
@@ -258,5 +301,6 @@ const styles = StyleSheet.create({
   ctaTextContainer: { flex: 1, marginLeft: 16 },
   ctaTitle: { fontSize: 18, fontWeight: 'bold' },
   ctaSubtitle: { fontSize: 14, marginTop: 4 },
+  searchButton: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginLeft: 8, justifyContent: 'center', alignItems: 'center' },
   errorText: { color: '#ef4444', textAlign: 'center', marginTop: 50, fontSize: 16, paddingHorizontal: 16 },
 });
