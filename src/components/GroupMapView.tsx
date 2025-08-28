@@ -214,7 +214,19 @@ document.addEventListener('message', (event) => {
 
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status === "granted") {
-      const loc = await Location.getCurrentPositionAsync({});
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        Alert.alert('Location services are turned off. Please enable Location/GPS or set a simulated location in the emulator.');
+        return;
+      }
+      let loc;
+      try {
+        loc = await Location.getCurrentPositionAsync({});
+      } catch (err) {
+        console.warn('Unable to get current position:', err.message || err);
+        Alert.alert('Current location is unavailable. Make sure location services are enabled.');
+        return;
+      }
       setCurrentLocation(loc.coords);
 
       const safeGroupId = sanitizeKey(groupId);
