@@ -1,15 +1,15 @@
 // app/(tabs)/home.tsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { StyleSheet, View, Text, SafeAreaView, ScrollView, FlatList, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, SafeAreaView, ScrollView, FlatList, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import PlaceCard from '@/components/PlaceCard';
 import CustomHeader from '@/components/CustomHeader';
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import { FontAwesome } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { fetchPlaces } from '@/lib/foursquare'; // 1. Import the real API fetch function
+import { fetchPlaces, fetchPlacesNearby, getDeviceLocation } from '@/lib/foursquare'; // 1. Import the real API fetch functions
 import { Place } from '@/lib/types';
-import * as Location from 'expo-location'; // 2. Import the location library
+// location is handled in the foursquare helper now
 import { useTripStore } from '@/services/tripService';
 import SelectActiveTripModal from '@/components/SelectActiveTripModal';
 
@@ -73,39 +73,65 @@ const ActiveTripBanner = () => {
 
 export default function HomeScreen() {
   const { theme } = useTheme();
-  // 3. Re-introduce state for places, loading, and errors
   const [places, setPlaces] = useState<Place[]>([]);
+  const [restaurants, setRestaurants] = useState<Place[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const testQueries = [
+    'popular places',
+    'restaurant',
+    'cafe',
+    'supermarket',
+    'hotel',
+    'petrol station',
+    'pharmacy',
+  ];
+  const [selectedQuery, setSelectedQuery] = useState<string>(testQueries[0]);
 
-  // 4. Re-introduce the useEffect hook for fetching live data
+  // This useEffect hook now handles location permissions and fetches live data
   useEffect(() => {
     const loadLocationAndPlaces = async () => {
       try {
         setLoading(true);
         setError(null);
-        let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          setError('Permission to access location was denied. Please enable it in your settings to see nearby places.');
+
+        // Simplify: use the centralized helper which requests permission and location
+        try {
+          // Get device coordinates explicitly
+          const { latitude, longitude } = await getDeviceLocation();
+          console.log('[Home] device coords', { latitude, longitude });
+
+          // Fetch two separate queries and merge into state variables
+          const popular = await fetchPlaces({ lat: latitude, lon: longitude, query: 'popular places', limit: 12 });
+          const restaurants = await fetchPlaces({ lat: latitude, lon: longitude, query: 'restaurant', limit: 12 });
+
+          // Prefer showing popular in the first carousel and restaurants in the second
+          setPlaces(popular);
+          // stash restaurants in a temporary state by attaching to a ref? Simpler: setPlaces to popular and
+          // keep restaurants in a local variable to reverse for second carousel
+          // We'll set a small local state for restaurants
+          setRestaurants(restaurants);
+        } catch (locErr: any) {
+          console.error('places fetch error:', locErr);
+          setError(typeof locErr === 'string' ? locErr : locErr.message || 'Current location is unavailable.');
           setLoading(false);
           return;
         }
-        let location = await Location.getCurrentPositionAsync({});
-        const { latitude, longitude } = location.coords;
-        const fetchedPlaces = await fetchPlaces({ lat: latitude, lon: longitude });
-        setPlaces(fetchedPlaces);
+
       } catch (e) {
-        setError("Failed to load places. Please check your internet connection.");
+        setError("Failed to load places. Please check your connection and location services.");
+        console.error(e);
       } finally {
         setLoading(false);
       }
     };
+
     loadLocationAndPlaces();
-  }, []);
+  }, []); // The empty array ensures this runs only once when the screen mounts
 
   const reversedPlaces = useMemo(() => [...places].reverse(), [places]);
+  const reversedRestaurants = useMemo(() => [...restaurants].reverse(), [restaurants]);
 
-  // 5. Create a helper to render content based on the loading/error state
   const renderContent = () => {
     if (loading) {
       return <ActivityIndicator size="large" color={colors.primary[theme]} style={{ marginTop: 50 }} />;
@@ -113,10 +139,13 @@ export default function HomeScreen() {
     if (error) {
       return <Text style={styles.errorText}>{error}</Text>;
     }
+    if (places.length === 0) {
+        return <Text style={[styles.errorText, {color: colors.textMuted[theme]}]}>No places found nearby.</Text>
+    }
     return (
       <>
         <CategoryCarousel title="Popular Near You" places={places} />
-        <CategoryCarousel title="Top-Rated Restaurants" places={reversedPlaces} />
+        <CategoryCarousel title="Top-Rated Restaurants" places={reversedRestaurants} />
       </>
     );
   };
@@ -137,6 +166,57 @@ export default function HomeScreen() {
               />
             </View>
           </View>
+
+          {__DEV__ && (
+            <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+              <Text style={{ marginBottom: 8, color: colors.textMuted[theme] }}>Dev: pick a query</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {testQueries.map((q) => (
+                  <TouchableOpacity
+                    key={q}
+                    onPress={() => setSelectedQuery(q)}
+                    style={{
+                      paddingVertical: 6,
+                      paddingHorizontal: 10,
+                      borderRadius: 20,
+                      marginRight: 8,
+                      marginBottom: 8,
+                      backgroundColor: selectedQuery === q ? colors.primary[theme] : colors.card[theme],
+                    }}
+                  >
+                    <Text style={{ color: selectedQuery === q ? '#fff' : colors.text[theme] }}>{q}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TouchableOpacity
+                onPress={async () => {
+                  console.log('[DevTest] Run pressed, selectedQuery=', selectedQuery);
+                  Alert.alert('Dev Run', `Query: ${selectedQuery}`);
+                  setLoading(true);
+                  setError(null);
+                  try {
+                    const fetched = await fetchPlacesNearby({ query: selectedQuery, radius: 10000, limit: 20 });
+                    console.log('[DevTest] fetched places count', fetched.length);
+                    setPlaces(fetched);
+                    const fetchedRestaurants = await fetchPlacesNearby({ query: 'restaurant', radius: 10000, limit: 20 });
+                    setRestaurants(fetchedRestaurants);
+                  } catch (e) {
+                    console.error(e);
+                    setError('Dev test fetch failed');
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Run dev query"
+                style={{ backgroundColor: colors.card[theme], padding: 10, borderRadius: 8, marginTop: 8 }}
+              >
+                <Text style={{ color: colors.primary[theme], textAlign: 'center', fontWeight: '600' }}>Run</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           <ActiveTripBanner />
 
