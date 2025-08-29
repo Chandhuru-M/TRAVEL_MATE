@@ -69,8 +69,6 @@ export async function fetchPlaces(params: FetchPlacesParams): Promise<Place[]> {
 
   // Map Foursquare response to the mobile Place type
   const places: Place[] = results.map((p: any) => ({
-    // Foursquare may return different id fields depending on endpoint/version.
-    // Prefer `fsq_id`, then `fsq_place_id`, then `id`.
     fsq_id: p.fsq_id || p.fsq_place_id || p.id,
     name: p.name,
     // mobile expects categories as array of objects with name
