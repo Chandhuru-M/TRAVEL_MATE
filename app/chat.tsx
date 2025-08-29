@@ -5,7 +5,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import { FontAwesome } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { sendChatMobile, type Place as MobilePlace } from '@/services/mobileChatBot';
+import { sendChatMobile } from '@/services/mobileChatBot';
 import * as Speech from 'expo-speech';
 import { router } from 'expo-router';
 import { analyzeTextWithGemini, GeminiChatResponse } from '@/services/geminiService';
@@ -66,6 +66,26 @@ export default function ChatScreen() {
     },
   };
 
+  // Render assistant text without markdown asterisks and with simple bullets
+  const toPlain = (md: string) => {
+    if (!md) return ''
+    let s = md.replace(/\r\n/g, '\n')
+    // Remove headings like ## Title
+    s = s.replace(/^\s*#{1,6}\s+/gm, '')
+    // Convert -/* bullets to •
+    s = s.replace(/^(\s*)[-*]\s+/gm, '$1• ')
+    // Bold/italic markers
+    s = s.replace(/\*\*([^*]+)\*\*/g, '$1')
+    s = s.replace(/\*([^*]+)\*/g, '$1')
+    // Backticks
+    s = s.replace(/`{1,3}([^`]+)`{1,3}/g, '$1')
+    // Extra asterisks leftovers
+    s = s.replace(/\*{3,}/g, '')
+    // Collapse blank lines
+    s = s.replace(/\n{3,}/g, '\n\n')
+    return s.trim()
+  }
+
   const onSend = async () => {
     if (!input.trim() || loading) return;
     const content = input.trim();
@@ -73,33 +93,46 @@ export default function ChatScreen() {
     setMessages((m) => [...m, userMsg]);
     setInput('');
     setLoading(true);
+  // Note: No auto-navigation for pre-booking. We'll render a button under the user's message instead.
 
     // --- NEW: Detect if user is selecting a place by name or number after recommendations ---
     // Find the last assistant message with places
-    const lastAssistantMsg = [...messages].reverse().find(m => m.role === 'assistant' && m.places && m.places.length > 0);
-    if (lastAssistantMsg) {
+  const lastAssistantMsg = [...messages].reverse().find(m => m.role === 'assistant' && m.places && m.places.length > 0);
+  if (lastAssistantMsg) {
       // Try to match by number (e.g., "2" or "2. Lotus Temple")
       const numMatch = content.match(/^(\d+)[\.\s-]*/);
       let selectedPlace = null;
       if (numMatch) {
         const idx = parseInt(numMatch[1], 10) - 1;
-        if (idx >= 0 && idx < lastAssistantMsg.places.length) {
-          selectedPlace = lastAssistantMsg.places[idx];
+        if (idx >= 0 && idx < (lastAssistantMsg.places?.length || 0)) {
+          selectedPlace = lastAssistantMsg.places?.[idx] as any;
         }
       }
       // Try to match by name (case-insensitive substring)
       if (!selectedPlace) {
-        selectedPlace = lastAssistantMsg.places.find(
+        selectedPlace = lastAssistantMsg.places?.find(
           p => p.name && p.name.toLowerCase().includes(content.toLowerCase())
-        );
+        ) as any;
       }
       if (selectedPlace) {
-        // Prefer opening Google Maps directions directly (requested behavior)
+        // Prefer opening Google Maps directions directly with live origin. If origin missing, fetch it now.
         const lat = (selectedPlace as any).latitude ?? (selectedPlace as any).lat ?? (selectedPlace as any).geocodes?.main?.lat;
         const lng = (selectedPlace as any).longitude ?? (selectedPlace as any).lng ?? (selectedPlace as any).geocodes?.main?.lng;
         if (typeof lat === 'number' && typeof lng === 'number') {
-          if (userLocation) {
-            const origin = encodeURIComponent(`${userLocation.lat},${userLocation.lng}`);
+          let originLat = userLocation?.lat;
+          let originLng = userLocation?.lng;
+          if (originLat == null || originLng == null) {
+            try {
+              const { status } = await Location.requestForegroundPermissionsAsync();
+              if (status === 'granted') {
+                const loc = await Location.getCurrentPositionAsync({});
+                originLat = loc.coords.latitude; originLng = loc.coords.longitude;
+                setUserLocation({ lat: originLat, lng: originLng });
+              }
+            } catch {}
+          }
+          if (originLat != null && originLng != null) {
+            const origin = encodeURIComponent(`${originLat},${originLng}`);
             const dest = encodeURIComponent(`${lat},${lng}`);
             const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
             Linking.openURL(url).catch(() => alert('Could not open Google Maps.'));
@@ -110,8 +143,20 @@ export default function ChatScreen() {
           setLoading(false);
           return;
         } else {
-          // No coordinates: open Map View with fsq_id to resolve exact FSQ coordinates, include origin if available
-          router.push({ pathname: '/map-view' as any, params: { name: (selectedPlace as any).name || 'Destination', fsq_id: (selectedPlace as any).fsq_id || '', q: (selectedPlace as any).name || '', ulat: userLocation ? String(userLocation.lat) : '', ulng: userLocation ? String(userLocation.lng) : '' } });
+          // No coordinates: open Map View with fsq_id to resolve exact FSQ coordinates, include origin (fetch now if needed)
+          let originLat = userLocation?.lat;
+          let originLng = userLocation?.lng;
+          if (originLat == null || originLng == null) {
+            try {
+              const { status } = await Location.requestForegroundPermissionsAsync();
+              if (status === 'granted') {
+                const loc = await Location.getCurrentPositionAsync({});
+                originLat = loc.coords.latitude; originLng = loc.coords.longitude;
+                setUserLocation({ lat: originLat, lng: originLng });
+              }
+            } catch {}
+          }
+          router.push({ pathname: '/map-view' as any, params: { name: (selectedPlace as any).name || 'Destination', fsq_id: (selectedPlace as any).fsq_id || '', q: (selectedPlace as any).name || '', ulat: originLat ? String(originLat) : '', ulng: originLng ? String(originLng) : '' } });
           setLoading(false);
           return;
         }
@@ -129,7 +174,7 @@ export default function ChatScreen() {
       };
       setMessages((m) => [...m, assistantMsg]);
       if (autoSpeak) {
-        const text = res.reply.replace(/[📍🎯🌤️⛅☁️🌧️⛈️🌩️❄️🌫️💨🔥💧⭐🏨🍽️⛽🚗🗺️👋]/gu, '').trim();
+        const text = toPlain(res.reply).replace(/[📍🎯🌤️⛅☁️🌧️⛈️🌩️❄️🌫️💨🔥💧⭐🏨🍽️⛽🚗🗺️👋]/gu, '').trim();
         setSpeaking(true);
         Speech.speak(text, {
           rate: 0.9,
@@ -169,7 +214,7 @@ export default function ChatScreen() {
                   // Speak the last assistant message if available
                   const lastMsg = [...messages].reverse().find(m => m.role === 'assistant');
                   if (lastMsg) {
-                    const text = lastMsg.content.replace(/[📍🎯🌤️⛅☁️🌧️⛈️🌩️❄️🌫️💨🔥💧⭐🏨🍽️⛽🚗🗺️👋]/gu, '').trim();
+                    const text = toPlain(lastMsg.content).replace(/[📍🎯🌤️⛅☁️🌧️⛈️🌩️❄️🌫️💨🔥💧⭐🏨🍽️⛽🚗🗺️👋]/gu, '').trim();
                     setSpeaking(true);
                     Speech.speak(text, {
                       rate: 0.9,
@@ -203,12 +248,20 @@ export default function ChatScreen() {
             ]}
           >
             <Text style={msg.role === 'user' ? styles.userMessageText : [styles.assistantMessageText, { color: colors.text[theme] }]}> 
-              {msg.content}
+              {msg.role === 'assistant' ? toPlain(msg.content) : msg.content}
             </Text>
+            {msg.role === 'user' && /\b(pre\s*-?\s*book(ing)?|prebooking|pre\s*-?\s*booking)\b/i.test(msg.content) && (
+              <TouchableOpacity
+                style={[styles.primaryButton, { backgroundColor: '#0baff5ff', minHeight: 48, marginTop: 12 }]}
+                onPress={() => router.push('/(tabs)/pre-booking')}
+              >
+                <Text style={styles.primaryButtonText}>Open now</Text>
+              </TouchableOpacity>
+            )}
             {/* Show Plan Trip button below user message if trip planning intent detected */}
             {msg.role === 'user' && /plan(\s|\w|\W)*trip|trip(\s|\w|\W)*plan|trip(\s|\w|\W)*planning/i.test(msg.content) && (
               <TouchableOpacity
-                style={[styles.primaryButton, { backgroundColor: '#19ccd9ff', minHeight: 50, marginTop: 15 }]}
+                style={[styles.primaryButton, { backgroundColor: '#0baff5ff', minHeight: 50, marginTop: 15 }]}
                 onPress={() => router.push('/(tabs)/trip-planner')}
               >
                 <Text style={styles.primaryButtonText}>Go to Trip</Text>
@@ -266,9 +319,9 @@ export default function ChatScreen() {
                           const ulat = userLocation?.lat
                           const ulng = userLocation?.lng
                           if (typeof lat === 'number' && typeof lng === 'number') {
-                            router.push({ pathname: '/map-view' as any, params: { lat: String(lat), lng: String(lng), name: p.name || 'Destination', fsq_id: p.fsq_id || '', ulat: ulat ? String(ulat) : '', ulng: ulng ? String(ulng) : '' } });
+                            const placesPayload = (msg.places || []).slice(0, 10).map((pl, i) => ({ id: pl.fsq_id || pl.id || String(i), name: pl.name, lat: pl.latitude ?? pl.geocodes?.main?.lat, lng: pl.longitude ?? pl.geocodes?.main?.lng }))
+                            router.push({ pathname: '/map-view' as any, params: { lat: String(lat), lng: String(lng), name: p.name || 'Destination', fsq_id: p.fsq_id || '', ulat: ulat ? String(ulat) : '', ulng: ulng ? String(ulng) : '', places: JSON.stringify(placesPayload) } });
                           } else {
-                            // Fallback: open Google Maps by name/address so user still sees the place
                             const q = encodeURIComponent(p.name || p.location?.formatted_address || '');
                             const url = `https://www.google.com/maps/search/?api=1&query=${q}`;
                             Linking.openURL(url).catch(() => {});

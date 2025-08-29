@@ -2,7 +2,27 @@ import type { Place } from '../lib/types';
 // Mobile-native chatbot: Foursquare for places, OpenWeather for weather, optional Gemini for open-ended replies.
 import { fetchPlaces } from '../lib/foursquare';
 // Deterministic logic for places; Gemini only used as a last resort for general Q&A.
-import { askGemini } from '../services/geminiService';
+import { analyzeTextWithGemini } from '../services/geminiService';
+import type { GeminiChatResponse } from '../services/geminiService';
+
+type ParsedBudgetTime = { budget?: number | null; currency?: string | null; start?: string | null; end?: string | null };
+
+function parseBudgetAndTime(message: string): ParsedBudgetTime {
+    const m = (message || '').toLowerCase();
+    const res: ParsedBudgetTime = {};
+    const money = m.match(/(\d+[\.,]?\d*)\s*(rs|inr|rupees|₹|usd|\$|eur|€)/i);
+    if (money) {
+        res.budget = parseFloat(money[1].replace(',', '.'));
+        const cur = money[2].toUpperCase();
+        res.currency = cur === '₹' || /RS|INR|RUPEES/i.test(cur) ? 'INR' : /USD|\$/i.test(cur) ? 'USD' : /EUR|€/i.test(cur) ? 'EUR' : cur;
+    }
+    const time = m.match(/(\d{1,2}\s*(?:am|pm))\s*(?:to|\-|→)\s*(\d{1,2}\s*(?:am|pm))/i);
+    if (time) {
+        res.start = time[1];
+        res.end = time[2];
+    }
+    return res;
+}
 
 async function planTrip(message: string, loc: LatLng): Promise<ChatResponse> {
     const { budget, currency, start, end } = parseBudgetAndTime(message)
@@ -244,11 +264,8 @@ export async function sendChatMobile(params: {
 
     // Fallback: Use Gemini API for open-ended or unhandled questions
     try {
-        const geminiReply = await askGemini(
-            'You are a concise, friendly travel assistant. Answer the user question naturally and helpfully. If the user asks about places, you may ask for their location and a category (restaurant, hotel, gym, park, cafe, mall).',
-            msg
-        );
-        return { reply: geminiReply };
+        const { reply } = await analyzeTextWithGemini(msg, location || null);
+        return { reply };
     } catch {
         return { reply: "Sorry, I couldn't answer that right now." }
     }
