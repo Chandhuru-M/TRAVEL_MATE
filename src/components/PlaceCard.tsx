@@ -54,6 +54,20 @@ export default function PlaceCard({ place, style }: PlaceCardProps) {
     }
   };
 
+  const handlePin = () => {
+    // navigate to map and instruct SoloMapView to show directions
+    try {
+  const lat = (place as any).latitude ?? (place.location as any)?.lat ?? (place.location as any)?.latitude ?? (place as any).lat ?? null;
+  const lon = (place as any).longitude ?? (place.location as any)?.lon ?? (place.location as any)?.longitude ?? (place as any).lon ?? null;
+  if (!lat || !lon) { Alert.alert('Location unavailable', 'This place does not have coordinates to navigate to.'); return; }
+  const payload = encodeURIComponent(JSON.stringify({ latitude: lat, longitude: lon, name: place.name }));
+      router.push(`/map?solo=${payload}` as any);
+    } catch (e) {
+      console.warn('pin navigation failed', e);
+      Alert.alert('Unable to open map');
+    }
+  };
+
   return (
     <View style={[styles.card, { backgroundColor: colors.card[theme] }, style]}>
       <TouchableOpacity onPress={handlePress}>
@@ -69,6 +83,10 @@ export default function PlaceCard({ place, style }: PlaceCardProps) {
       {/* --- SAVE BUTTON --- */}
       <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
         <FontAwesome name="bookmark" size={20} color={'white'} />
+      </TouchableOpacity>
+      {/* --- PIN / DIRECTIONS BUTTON --- */}
+      <TouchableOpacity style={styles.pinButton} onPress={handlePin}>
+        <FontAwesome name="map-pin" size={18} color={'white'} />
       </TouchableOpacity>
     </View>
   );
@@ -86,6 +104,14 @@ const styles = StyleSheet.create({
       top: 12,
       right: 12,
       backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      padding: 8,
+      borderRadius: 20,
+    },
+    pinButton: {
+      position: 'absolute',
+      top: 12,
+      right: 52,
+      backgroundColor: 'rgba(0, 122, 255, 0.9)',
       padding: 8,
       borderRadius: 20,
     },
