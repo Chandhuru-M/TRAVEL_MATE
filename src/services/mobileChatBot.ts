@@ -1,8 +1,8 @@
-
 import type { Place } from '../lib/types';
 // Mobile-native chatbot: Foursquare for places, OpenWeather for weather, optional Gemini for open-ended replies.
 import { fetchPlaces } from '../lib/foursquare';
 // Deterministic logic for places; Gemini only used as a last resort for general Q&A.
+import { askGemini } from '../services/geminiService';
 
 async function planTrip(message: string, loc: LatLng): Promise<ChatResponse> {
     const { budget, currency, start, end } = parseBudgetAndTime(message)
@@ -85,6 +85,11 @@ export async function fetchFsqCategories(): Promise<string[]> {
     }
 }
 
+// Update: Always fetch places for all major categories if user asks for "all categories" or similar
+const ALL_FSQ_CATEGORIES = [
+    'restaurant', 'cafe', 'hotel', 'atm', 'park', 'gym', 'mall', 'fuel station', 'temple', 'museum', 'pharmacy', 'hospital', 'supermarket', 'bank'
+];
+
 export async function sendChatMobile(params: {
     message: string
     location?: LatLng | null
@@ -127,6 +132,43 @@ export async function sendChatMobile(params: {
             const cats = await fetchFsqCategories()
             const hint = cats.length ? `You can also try: ${cats.slice(0, 15).join(', ')}.` : ''
             return { reply: `Sorry, I couldn’t fetch fuel stations right now. ${hint}` }
+        }
+    }
+
+    // --- NEW: Handle "all categories" or similar requests ---
+    if (
+        /all\s*categories|all\s*places|everything\s*nearby|show\s*all/i.test(lower)
+        || (pickCategoryFromMessage(lower) === null && /(categories|types|all|everything)/i.test(lower))
+    ) {
+        if (!location) return { reply: 'I need your location to find all categories.' }
+        try {
+            let allPlaces: Place[] = [];
+            for (const cat of ALL_FSQ_CATEGORIES) {
+                const found = await fetchPlaces({ lat: location.lat, lon: location.lng, query: cat, limit: 2, radius: 6000 });
+                allPlaces = allPlaces.concat(found.map(p => ({ ...p, category: cat })));
+            }
+            if (!allPlaces.length) {
+                return { reply: 'No places found for any category nearby.' }
+            }
+            // Group by category for reply
+            const grouped: Record<string, Place[]> = {};
+            for (const p of allPlaces) {
+                const cat = p.category || 'Other';
+                if (!grouped[cat]) grouped[cat] = [];
+                grouped[cat].push(p);
+            }
+            let reply = 'Here are some places from all major categories near you:\n\n';
+            for (const cat of ALL_FSQ_CATEGORIES) {
+                if (grouped[cat] && grouped[cat].length) {
+                    reply += `**${cat.charAt(0).toUpperCase() + cat.slice(1)}s:**\n`;
+                    reply += grouped[cat].map((p, i) =>
+                        `• ${p.name}${p.rating ? ` ⭐${p.rating}` : ''} - ${p.location?.formatted_address || 'Address not available'}`
+                    ).join('\n') + '\n\n';
+                }
+            }
+            return { reply: reply.trim(), places: allPlaces };
+        } catch {
+            return { reply: 'Sorry, I could not fetch all categories right now.' }
         }
     }
 
@@ -191,21 +233,25 @@ export async function sendChatMobile(params: {
         } catch {}
         try {
             const tripPlanReply = await planTrip(msg, location);
-            // Add a button for trip planner map
+            // Add a button for trip planner map and a navigation hint
             return {
                 ...tripPlanReply,
                 reply: tripPlanReply.reply + budgetText +
-                  "\n\n[Open Trip Planner Map](app/(tabs)/trip-planner)"
+                  "\n\n[Open Trip Planner Map](app/(tabs)/trip-planner)\n\n_Tap 'Go to Trip' or 'Plan Trip' to open the Trip Planner tab._"
             };
         } catch {}
     }
 
-    // Generic ask -> Gemini (optional)
-    // const llm = await askGemini(
-    //     'You are a concise, friendly travel assistant. Answer briefly (1-2 lines). If the user asks about places, ask for their location and a category (restaurant, hotel, gym, park, cafe, mall).',
-    //     msg,
-    // )
-    return { reply: "Try: 'nearby hotel', 'find gym', 'weather now', or 'plan trip 9 am to 6 pm, 3000 rs'." }
+    // Fallback: Use Gemini API for open-ended or unhandled questions
+    try {
+        const geminiReply = await askGemini(
+            'You are a concise, friendly travel assistant. Answer the user question naturally and helpfully. If the user asks about places, you may ask for their location and a category (restaurant, hotel, gym, park, cafe, mall).',
+            msg
+        );
+        return { reply: geminiReply };
+    } catch {
+        return { reply: "Sorry, I couldn't answer that right now." }
+    }
 }
 
 // // Mobile-native chat bot that runs on device, using public APIs (Foursquare/Mapbox for places, OpenWeather for weather)

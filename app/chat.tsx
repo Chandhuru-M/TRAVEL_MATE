@@ -8,9 +8,9 @@ import * as Location from 'expo-location';
 import { sendChatMobile, type Place as MobilePlace } from '@/services/mobileChatBot';
 import * as Speech from 'expo-speech';
 import { router } from 'expo-router';
-import { analyzeTextWithGemini } from '@/services/geminiService';
+import { analyzeTextWithGemini, GeminiChatResponse } from '@/services/geminiService';
+import { Place } from '@/lib/types';
 
-type Place = MobilePlace;
 type ChatMsg = { id: string; role: 'assistant' | 'user'; content: string; places?: Place[] };
 
 function haversine(lat1:number, lon1:number, lat2:number, lon2:number) {
@@ -93,29 +93,40 @@ export default function ChatScreen() {
           p => p.name && p.name.toLowerCase().includes(content.toLowerCase())
         );
       }
-      if (selectedPlace && userLocation) {
-        // Navigate to live navigation screen with params
-        router.push({
-          pathname: '/live-navigation',
-          params: {
-            lat: selectedPlace.latitude,
-            lng: selectedPlace.longitude,
-            name: selectedPlace.name,
-            profile: 'driving', // or walking/cycling if you parse that from user input
-            ulat: userLocation.lat,
-            ulng: userLocation.lng,
+      if (selectedPlace) {
+        // Prefer opening Google Maps directions directly (requested behavior)
+        const lat = (selectedPlace as any).latitude ?? (selectedPlace as any).lat ?? (selectedPlace as any).geocodes?.main?.lat;
+        const lng = (selectedPlace as any).longitude ?? (selectedPlace as any).lng ?? (selectedPlace as any).geocodes?.main?.lng;
+        if (typeof lat === 'number' && typeof lng === 'number') {
+          if (userLocation) {
+            const origin = encodeURIComponent(`${userLocation.lat},${userLocation.lng}`);
+            const dest = encodeURIComponent(`${lat},${lng}`);
+            const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
+            Linking.openURL(url).catch(() => alert('Could not open Google Maps.'));
+          } else {
+            const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+            Linking.openURL(url).catch(() => {});
           }
-        });
-        setLoading(false);
-        return;
+          setLoading(false);
+          return;
+        } else {
+          // No coordinates: open Map View with fsq_id to resolve exact FSQ coordinates, include origin if available
+          router.push({ pathname: '/map-view' as any, params: { name: (selectedPlace as any).name || 'Destination', fsq_id: (selectedPlace as any).fsq_id || '', q: (selectedPlace as any).name || '', ulat: userLocation ? String(userLocation.lat) : '', ulng: userLocation ? String(userLocation.lng) : '' } });
+          setLoading(false);
+          return;
+        }
       }
     }
     // --- END NEW ---
 
     try {
-      // Always use on-device mobile chat (no server/web integration)
-      const res = await sendChatMobile({ message: content, location: userLocation, sessionId });
-      const assistantMsg: ChatMsg = { id: `${Date.now()}-assistant-${Math.random().toString(36).slice(2, 8)}`, role: 'assistant', content: res.reply, places: (res as any).places };
+      const res = await analyzeTextWithGemini(content, userLocation);
+      const assistantMsg: ChatMsg = { 
+        id: `${Date.now()}-assistant-${Math.random().toString(36).slice(2, 8)}`, 
+        role: 'assistant', 
+        content: res.reply,
+        places: res.places
+      };
       setMessages((m) => [...m, assistantMsg]);
       if (autoSpeak) {
         const text = res.reply.replace(/[📍🎯🌤️⛅☁️🌧️⛈️🌩️❄️🌫️💨🔥💧⭐🏨🍽️⛽🚗🗺️👋]/gu, '').trim();
@@ -226,18 +237,22 @@ export default function ChatScreen() {
                             alert('User location not available');
                             return;
                           }
-                          // Robust: check both direct and nested lat/lng
-                          const lat = p.latitude ?? p.lat ?? p.geocodes?.main?.lat;
-                          const lng = p.longitude ?? p.lng ?? p.geocodes?.main?.lng;
-                          if (typeof lat !== 'number' || typeof lng !== 'number') {
-                            alert('Place location not available');
-                            return;
+                          // Robust: check all possible lat/lng fields
+                          const lat = typeof p.latitude === 'number' ? p.latitude
+                            : typeof p.lat === 'number' ? p.lat
+                            : (typeof p.geocodes?.main?.lat === 'number' ? p.geocodes.main.lat : undefined);
+                          const lng = typeof p.longitude === 'number' ? p.longitude
+                            : typeof p.lng === 'number' ? p.lng
+                            : (typeof p.geocodes?.main?.lng === 'number' ? p.geocodes.main.lng : undefined);
+                          if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
+                            const origin = encodeURIComponent(`${userLocation.lat},${userLocation.lng}`);
+                            const dest = encodeURIComponent(`${lat},${lng}`);
+                            const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
+                            Linking.openURL(url).catch(() => alert('Could not open Google Maps.'));
+                          } else {
+                            // Fallback: open our in-app Map View with fsq_id (to resolve exact coords) and query; draw route and show distance
+                              router.push({ pathname: '/map-view' as any, params: { name: p.name || 'Destination', fsq_id: p.fsq_id || '', q: p.name || p.location?.formatted_address || '', ulat: String(userLocation.lat), ulng: String(userLocation.lng) } });
                           }
-                          // Use encodeURIComponent for origin and destination
-                          const origin = encodeURIComponent(`${userLocation.lat},${userLocation.lng}`);
-                          const dest = encodeURIComponent(`${lat},${lng}`);
-                          const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
-                          Linking.openURL(url).catch(() => alert('Could not open Google Maps.'));
                         }}
                       >
                         <FontAwesome name="map" size={18} color="white" />
@@ -248,11 +263,16 @@ export default function ChatScreen() {
                         onPress={() => {
                           const lat = p.latitude ?? p.lat ?? p.geocodes?.main?.lat;
                           const lng = p.longitude ?? p.lng ?? p.geocodes?.main?.lng;
-                          if (typeof lat !== 'number' || typeof lng !== 'number') {
-                            alert('Place location not available');
-                            return;
+                          const ulat = userLocation?.lat
+                          const ulng = userLocation?.lng
+                          if (typeof lat === 'number' && typeof lng === 'number') {
+                            router.push({ pathname: '/map-view' as any, params: { lat: String(lat), lng: String(lng), name: p.name || 'Destination', fsq_id: p.fsq_id || '', ulat: ulat ? String(ulat) : '', ulng: ulng ? String(ulng) : '' } });
+                          } else {
+                            // Fallback: open Google Maps by name/address so user still sees the place
+                            const q = encodeURIComponent(p.name || p.location?.formatted_address || '');
+                            const url = `https://www.google.com/maps/search/?api=1&query=${q}`;
+                            Linking.openURL(url).catch(() => {});
                           }
-                          router.push({ pathname: '/live-navigation' as any, params: { lat, lng, name: p.name, profile: 'driving' } });
                         }}
                       >
                         <FontAwesome name="map" size={18} color="white" />

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Linking, ActivityIndicator, ScrollView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
-import { getBestRoute, summarizeForSpeech, type RouteSummary } from '@/services/directions';
+import { getRouteORS, summarizeForSpeech, type RouteSummary } from '@/services/directions';
 import { colors } from '@/constants/Colors';
 // Avoid importing WebView on native to prevent RNCWebView missing module in Expo Go
 const WebView: any = Platform.OS === 'web' ? require('react-native-webview').WebView : null;
@@ -32,7 +32,7 @@ export default function Directions() {
         return;
       }
       try {
-        const s = await getBestRoute({ lat: userLat, lng: userLng }, { lat: destLat, lng: destLng }, 'driving');
+  const s = await getRouteORS({ lat: userLat, lng: userLng }, { lat: destLat, lng: destLng });
         if (!cancelled) {
           setSummary(s);
           setLoading(false);
