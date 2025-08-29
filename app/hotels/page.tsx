@@ -2,6 +2,8 @@ import React from 'react';
 import { View, FlatList, StyleSheet } from 'react-native';
 import HotelCard from './HotelCard';
 import { useRouter } from 'expo-router';
+import { useTheme } from '@/context/ThemeContext';
+import { colors } from '@/constants/Colors';
 
 const hotels = [
   { id: '1', name: 'Grand Palace', location: 'Chennai', price: 120, rating: 4.5, image: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb', discount: '20%' },
@@ -11,9 +13,10 @@ const hotels = [
 
 export default function HotelsIndex() {
   const router = useRouter();
+  const { theme } = useTheme();
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background[theme] }]}>
       <FlatList
         data={hotels}
         keyExtractor={(i) => i.id}
@@ -25,4 +28,4 @@ export default function HotelsIndex() {
   );
 }
 
-const styles = StyleSheet.create({ container: { flex: 1, padding: 16, backgroundColor: '#f2f6fb' } });
+const styles = StyleSheet.create({ container: { flex: 1, padding: 16 } });

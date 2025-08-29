@@ -1,47 +1,54 @@
 // app/(tabs)/map.tsx
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert, Animated } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import CustomHeader from '@/components/CustomHeader';
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import GroupMapView from '@/components/GroupMapView'; // Import the group map component
+import SoloMapView from '@/components/SoloMapView';
+import { useLocalSearchParams } from 'expo-router';
 
 export default function MapScreen() {
   const { theme } = useTheme();
-  const [isGroupView, setIsGroupView] = useState(false); // State to control which view is shown
+  const params = useLocalSearchParams() as any;
+  const initialSolo = params?.solo ? true : false;
+  const [mode, setMode] = useState<'group' | 'solo'>(initialSolo ? 'solo' : 'group');
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
-  const handleShowOwnLocation = () => {
-    Alert.alert("Show My Location", "This will be integrated with a solo map view in the future.");
-  };
-
-  // If the user has chosen to view the group map, render that component.
-  // We pass a function to allow the GroupMapView to set isGroupView back to false.
-  if (isGroupView) {
-    return <GroupMapView onLeave={() => setIsGroupView(false)} />;
+  let dest: { latitude: number; longitude: number; name?: string } | undefined = undefined;
+  if (params?.solo) {
+    try {
+      dest = JSON.parse(decodeURIComponent(params.solo));
+    } catch (e) { dest = undefined; }
   }
 
-  // Otherwise, show our new "launchpad" screen.
+  const toggleMode = (next: 'group' | 'solo') => {
+    Animated.timing(fadeAnim, { toValue: 0, duration: 250, useNativeDriver: true }).start(() => {
+      setMode(next);
+      Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }).start();
+    });
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background[theme] }}>
       <CustomHeader />
-      <View style={styles.container}>
-        <Text style={[styles.title, { color: colors.text[theme] }]}>Map Options</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted[theme] }]}>
-          Choose a map mode to continue
-        </Text>
+      <View style={{ flex: 1 }}>
+        <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+          {mode === 'group' ? (
+            <GroupMapView onLeave={() => {}} />
+          ) : (
+            <SoloMapView dest={dest} />
+          )}
+        </Animated.View>
 
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.button} onPress={() => setIsGroupView(true)}>
-            <FontAwesome name="users" size={24} color="white" />
-            <Text style={styles.buttonText}>Group Location Sharing</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.button} onPress={handleShowOwnLocation}>
-            <FontAwesome name="location-arrow" size={24} color="white" />
-            <Text style={styles.buttonText}>Show My Location</Text>
-          </TouchableOpacity>
-        </View>
+        {/* In-map floating toggle button */}
+        <TouchableOpacity
+          onPress={() => toggleMode(mode === 'group' ? 'solo' : 'group')}
+          style={{ position: 'absolute', top: 90, right: 16, backgroundColor: colors.primary[theme], padding: 12, borderRadius: 28, elevation: 8 }}
+        >
+          <FontAwesome name={mode === 'group' ? 'map' : 'users'} size={20} color="white" />
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
