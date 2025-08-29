@@ -100,6 +100,7 @@ export async function fetchPlaces(params: FetchPlacesParams): Promise<Place[]> {
     }
     const place: Place = {
       fsq_id: p.fsq_id || p.fsq_place_id || p.id,
+      fsq_place_id: p.fsq_place_id ?? p.fsq_id ?? p.id,
       name: p.name,
       categories: (p.categories || []).map((c: any) => ({ name: c.name })),
       distance: p.distance,
@@ -113,6 +114,11 @@ export async function fetchPlaces(params: FetchPlacesParams): Promise<Place[]> {
       rating: p.rating ?? undefined,
       price: p.price ?? undefined,
       photos: p.photos ?? undefined,
+      link: p.link ?? undefined,
+      related_places: p.related_places ?? undefined,
+      social_media: p.social_media ?? undefined,
+      tel: p.tel ?? p.phone ?? undefined,
+      website: p.website ?? p.url ?? undefined,
     } as Place;
     return place;
   }));
@@ -187,6 +193,7 @@ export async function getPlaceById(fsq_id: string): Promise<Place | null> {
   const lng = detail?.geocodes?.main?.longitude ?? detail?.geocodes?.main?.lng
   const place: Place = {
     fsq_id: detail.fsq_id,
+    fsq_place_id: detail.fsq_place_id ?? detail.fsq_id,
     name: detail.name,
     categories: (detail.categories || []).map((c: any) => ({ name: c.name })),
     distance: detail.distance,
@@ -200,6 +207,11 @@ export async function getPlaceById(fsq_id: string): Promise<Place | null> {
     rating: detail.rating ?? undefined,
     price: detail.price ?? undefined,
     photos: detail.photos ?? undefined,
+    link: detail.link ?? undefined,
+    related_places: detail.related_places ?? undefined,
+    social_media: detail.social_media ?? undefined,
+    tel: detail.tel ?? detail.phone ?? undefined,
+    website: detail.website ?? detail.url ?? undefined,
   }
   return place
 }
@@ -217,9 +229,34 @@ export async function fetchPlaceDetails(fsq_id: string): Promise<any> {
   } as Record<string, string>;
 
   try {
-    const res = await axios.get(url, { headers });
-    // return the raw response so callers can map as needed
-    return res.data;
+    const res: any = await axios.get(url, { headers });
+    const data = res.data?.result ?? res.data ?? res;
+    // normalize to Place-shaped object
+    const lat = data?.geocodes?.main?.latitude ?? data?.geocodes?.main?.lat;
+    const lng = data?.geocodes?.main?.longitude ?? data?.geocodes?.main?.lng;
+    const place: Place = {
+      fsq_id: data.fsq_id ?? data.fsq_id,
+      fsq_place_id: data.fsq_place_id ?? data.fsq_id,
+      name: data.name,
+      categories: (data.categories || []).map((c: any) => ({ name: c.name })),
+      distance: data.distance,
+      location: {
+        formatted_address: data.location?.formatted_address || data.location?.formatted || 'No address',
+        ...data.location,
+      },
+      geocodes: (typeof lat === 'number' && typeof lng === 'number') ? { main: { lat, lng } } : data.geocodes,
+      latitude: (typeof lat === 'number') ? lat : undefined,
+      longitude: (typeof lng === 'number') ? lng : undefined,
+      rating: data.rating ?? undefined,
+      price: data.price ?? undefined,
+      photos: data.photos ?? undefined,
+      link: data.link ?? undefined,
+      related_places: data.related_places ?? undefined,
+      social_media: data.social_media ?? undefined,
+      tel: data.tel ?? data.phone ?? undefined,
+      website: data.website ?? data.url ?? undefined,
+    } as Place;
+    return place;
   } catch (err: any) {
     if (err.response) {
       console.error('[fetchPlaceDetails] Foursquare API Error:', err.response.status, err.response.data);
