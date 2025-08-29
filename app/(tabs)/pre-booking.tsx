@@ -1,11 +1,12 @@
 // app/(tabs)/pre-booking.tsx
-import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, FlatList, TextInput, TouchableOpacity } from 'react-native';
 import CustomHeader from '@/components/CustomHeader';
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import HotelCard from '../hotels/HotelCard';
 import { useRouter } from 'expo-router';
+import { FontAwesome } from '@expo/vector-icons';
 
 const hotels = [
   { id: '1', name: 'Grand Palace', location: 'Chennai', price: 120, rating: 4.5, image: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb', discount: '20%' },
@@ -18,17 +19,41 @@ const hotels = [
 export default function PreBookingScreen() {
   const { theme } = useTheme();
   const router = useRouter();
+  const [searchText, setSearchText] = useState('');
+
+  const filtered = useMemo(() => {
+    const q = searchText.trim().toLowerCase();
+    if (!q) return hotels;
+    return hotels.filter(h => h.name.toLowerCase().includes(q) || h.location.toLowerCase().includes(q));
+  }, [searchText]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background[theme] }}>
       <CustomHeader />
       <View style={styles.container}>
-        <Text style={[styles.header, { color: colors.text[theme] }]}>Hotel Pre-booking</Text>
+        <View style={styles.searchSection}>
+          <Text style={[styles.welcomeTitle, { color: colors.text[theme] }]}>Hotel Pre-booking</Text>
+
+          <View style={[styles.searchBar, { backgroundColor: colors.card[theme] }]}>
+            <FontAwesome name="search" size={18} color={colors.textMuted[theme]} />
+            <TextInput
+              placeholder="Search hotels or location"
+              placeholderTextColor={colors.textMuted[theme]}
+              style={[styles.searchInput, { color: colors.text[theme] }]}
+              value={searchText}
+              onChangeText={setSearchText}
+              returnKeyType="search"
+            />
+            <TouchableOpacity onPress={() => {}} style={[styles.searchButton, { backgroundColor: colors.primary[theme] }]}>
+              <Text style={{ color: '#fff', fontWeight: '600' }}>Search</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <FlatList
-          data={hotels}
+          data={filtered}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 16 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
           renderItem={({ item }) => (
             <HotelCard
               hotel={item}
@@ -36,6 +61,7 @@ export default function PreBookingScreen() {
             />
           )}
           showsVerticalScrollIndicator={false}
+          ListEmptyComponent={<Text style={[styles.emptyText, { color: colors.textMuted[theme] }]}>No hotels found.</Text>}
         />
       </View>
     </SafeAreaView>
@@ -43,5 +69,10 @@ export default function PreBookingScreen() {
 }
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { fontSize: 22, fontWeight: '700', padding: 16 },
+  searchSection: { paddingHorizontal: 16, paddingTop: 16 },
+  welcomeTitle: { fontSize: 22, fontWeight: '700', marginBottom: 12 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingHorizontal: 12, height: 48 },
+  searchInput: { marginLeft: 10, fontSize: 16, flex: 1 },
+  searchButton: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginLeft: 8, justifyContent: 'center', alignItems: 'center' },
+  emptyText: { textAlign: 'center', marginTop: 30 },
 });

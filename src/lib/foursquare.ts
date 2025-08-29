@@ -63,10 +63,15 @@ export async function fetchPlaces(params: FetchPlacesParams): Promise<Place[]> {
   const data: any = await fsqSearch(searchParams);
   const results = data.results || [];
   console.log('[fetchPlaces] searchParams:', searchParams, 'resultsCount:', results.length);
+  if (results.length > 0) {
+    console.log('[fetchPlaces] firstResultKeys:', Object.keys(results[0]).slice(0, 20));
+  }
 
   // Map Foursquare response to the mobile Place type
   const places: Place[] = results.map((p: any) => ({
-    fsq_id: p.fsq_id,
+    // Foursquare may return different id fields depending on endpoint/version.
+    // Prefer `fsq_id`, then `fsq_place_id`, then `id`.
+    fsq_id: p.fsq_id || p.fsq_place_id || p.id,
     name: p.name,
     // mobile expects categories as array of objects with name
     categories: (p.categories || []).map((c: any) => ({ name: c.name })),
@@ -141,4 +146,30 @@ export async function getDeviceLocation(): Promise<{ latitude: number; longitude
 
   if (!loc || !loc.coords) throw new Error('Current location is unavailable');
   return { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+}
+
+// Fetch detailed place information by fsq_id
+export async function fetchPlaceDetails(fsq_id: string): Promise<any> {
+  ensureKey();
+  if (!fsq_id) throw new Error('fsq_id is required');
+
+  const url = `${BASE}/places/${encodeURIComponent(fsq_id)}`;
+  const headers = {
+    accept: 'application/json',
+    Authorization: `Bearer ${SERVICE_KEY}`,
+    'X-Places-Api-Version': API_VERSION,
+  } as Record<string, string>;
+
+  try {
+    const res = await axios.get(url, { headers });
+    // return the raw response so callers can map as needed
+    return res.data;
+  } catch (err: any) {
+    if (err.response) {
+      console.error('[fetchPlaceDetails] Foursquare API Error:', err.response.status, err.response.data);
+    } else {
+      console.error('[fetchPlaceDetails] Request failed:', err.message);
+    }
+    throw err;
+  }
 }

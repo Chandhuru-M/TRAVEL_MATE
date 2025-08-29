@@ -1,6 +1,8 @@
 import React from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useTheme } from '@/context/ThemeContext';
+import { colors } from '@/constants/Colors';
 
 export default function Payment() {
   const params = useLocalSearchParams();
@@ -13,7 +15,11 @@ export default function Payment() {
   const guests = params.guests as string;
   const rooms = parseInt(params.rooms as string || '1', 10);
 
-  if (!h) return <View style={{flex:1,justifyContent:'center',alignItems:'center'}}><Text>No booking data</Text></View>;
+  const { theme } = useTheme();
+  const bg = colors.background[theme];
+  const textColor = colors.text[theme];
+
+  if (!h) return <View style={{flex:1,justifyContent:'center',alignItems:'center', backgroundColor: bg}}><Text style={{ color: textColor }}>No booking data</Text></View>;
 
   const nights = Math.max(1, Math.ceil((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / (1000*60*60*24)));
   const total = h.price * rooms * nights;
@@ -24,13 +30,13 @@ export default function Payment() {
   };
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 16 }}>
-      <Text style={{ fontSize: 20, fontWeight: '700' }}>Payment</Text>
+    <ScrollView contentContainerStyle={{ padding: 16, backgroundColor: bg }}>
+      <Text style={{ fontSize: 20, fontWeight: '700', color: textColor }}>Payment</Text>
       <View style={{ marginTop: 12 }}>
-        <Text>Hotel: {h.name}</Text>
-        <Text>Guest: {name}</Text>
-        <Text>Nights: {nights}</Text>
-        <Text>Total: ${total}</Text>
+        <Text style={{ color: textColor }}>Hotel: {h.name}</Text>
+        <Text style={{ color: textColor }}>Guest: {name}</Text>
+        <Text style={{ color: textColor }}>Nights: {nights}</Text>
+        <Text style={{ color: textColor }}>Total: ${total}</Text>
       </View>
 
       <TouchableOpacity style={styles.payButton} onPress={handlePay}>
