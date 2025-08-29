@@ -1,10 +1,16 @@
 import React, { useRef, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
+import type { LatLng, Place } from '@/lib/types';
 
 const MAPBOX_TOKEN = 'pk.eyJ1Ijoic291bmRoYXJ5YSIsImEiOiJjbWU4MG0zZHcwNXJ5MmpxeGRxYW1sdWU4In0.R1lZA658526l1ZF2VxGG-w';
 
-export default function PlaceMapView({ userLocation, place }) {
+type Props = {
+  userLocation?: LatLng | null;
+  place?: Partial<Place> | null;
+};
+
+export default function PlaceMapView({ userLocation, place }: Props) {
   const webviewRef = useRef(null);
 
   // Build the HTML for Mapbox map with user and place markers
