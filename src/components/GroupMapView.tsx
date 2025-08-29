@@ -22,7 +22,7 @@ import axios from "axios";
 // --- THIS IS THE FINAL AND DEFINITIVE FIX ---
 // 1. Import the core Firebase libraries directly
 import { initializeApp, getApp, getApps } from "firebase/app";
-import { getDatabase, ref as dbRef, set as dbSet, onValue, remove as dbRemove } from "firebase/database";
+import { getDatabase, ref as dbRef, set as dbSet, onValue, remove as dbRemove, get } from "firebase/database";
 
 // 2. Define the config and initialize Firebase INSIDE this component
 const firebaseConfig = {
@@ -49,6 +49,13 @@ const GEOAPIFY_KEY = "c82e492f814643bb995b2f02e110e591";
 
 function sanitizeKey(key) {
   return key.replace(/[.#$[@]/g, "_");
+}
+
+function normalizePhoneNumber(p) {
+  if (!p) return '';
+  // remove non-digit characters and leading zeros
+  const digits = p.toString().replace(/\D/g, '');
+  return digits.replace(/^0+/, '');
 }
 
 const categoryMap = {
@@ -121,6 +128,7 @@ const map = new mapboxgl.Map({ container: 'map', style: 'mapbox://styles/mapbox/
 const markers = {};
 const placesMarkers = {};
 let startMarker = null, endMarker = null;
+let centerMarker = null;
 window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
 
 document.addEventListener('message', (event) => {
@@ -130,21 +138,36 @@ document.addEventListener('message', (event) => {
 
     if(data.type==='CENTER'){
       map.flyTo({center:data.center, zoom:data.zoom});
-      new mapboxgl.Marker({color:'green'})
+      try {
+        if (centerMarker) centerMarker.remove();
+      } catch(e){}
+      centerMarker = new mapboxgl.Marker({color:'green'})
         .setLngLat(data.center)
         .setPopup(new mapboxgl.Popup().setText("You are here"))
         .addTo(map);
     }
 
     if(data.type==='USERS'){
-      for(const uid in markers){ markers[uid].remove(); }
+      // Only update markers where location has changed; remove markers for users no longer present
+      const incomingUids = new Set(data.users.map(u => u.uid));
+      for(const uid in markers){ if(!incomingUids.has(uid)){ try { markers[uid].remove(); } catch(e){} delete markers[uid]; } }
       for(const user of data.users){
         if(user.latitude && user.longitude){
-          const marker=new mapboxgl.Marker({color:'blue'})
-            .setLngLat([user.longitude,user.latitude])
-            .setPopup(new mapboxgl.Popup().setText(user.name))
-            .addTo(map);
-          markers[user.uid]=marker;
+          const prev = markers[user.uid];
+          const lngLat = [user.longitude, user.latitude];
+          let needUpdate = true;
+          if (prev && prev.getLngLat) {
+            const p = prev.getLngLat();
+            if (p.lng === user.longitude && p.lat === user.latitude) needUpdate = false;
+          }
+          if (needUpdate) {
+            if (prev) { try { prev.remove(); } catch(e){} }
+            const marker=new mapboxgl.Marker({color:'blue'})
+              .setLngLat(lngLat)
+              .setPopup(new mapboxgl.Popup().setText(user.name))
+              .addTo(map);
+            markers[user.uid]=marker;
+          }
         }
       }
     }
@@ -208,7 +231,8 @@ document.addEventListener('message', (event) => {
       Alert.alert("Enter group ID, name, and phone number");
       return;
     }
-    const generatedUid = phone;
+    const normalizedPhone = normalizePhoneNumber(phone);
+    const generatedUid = normalizedPhone || phone;
     setUid(generatedUid);
     setJoined(true);
 
@@ -230,6 +254,20 @@ document.addEventListener('message', (event) => {
       setCurrentLocation(loc.coords);
 
       const safeGroupId = sanitizeKey(groupId);
+      // Remove all previous pins for this phone number in this group (normalize numbers)
+      try {
+        const usersSnapshot = await get(dbRef(db, `groups/${safeGroupId}/users`));
+        const val = usersSnapshot.val() || {};
+        for (const k of Object.keys(val)) {
+          const otherPhone = normalizePhoneNumber(val[k]?.phone);
+          if (otherPhone && otherPhone === normalizedPhone && k !== generatedUid) {
+            try { await dbRemove(dbRef(db, `groups/${safeGroupId}/users/${k}`)); } catch(e) { console.warn('remove old user failed', e); }
+          }
+        }
+      } catch (e) {
+        console.warn('error reading users for cleanup', e);
+      }
+
       const userRef = dbRef(db, `groups/${safeGroupId}/users/${generatedUid}`);
       await dbSet(userRef, {
         uid: generatedUid,
@@ -254,14 +292,28 @@ document.addEventListener('message', (event) => {
       Alert.alert("Location permission required");
       return;
     }
-    const subscription = await Location.watchPositionAsync(
+      const subscription = await Location.watchPositionAsync(
       { accuracy: Location.Accuracy.Highest, distanceInterval: 5, timeInterval: 5000 },
-      (pos) => {
+      async (pos) => {
         if (!(joined && isSharing && uid)) return;
         const { latitude, longitude } = pos.coords;
         setCurrentLocation({ latitude, longitude });
 
         const safeGroupId = sanitizeKey(groupId);
+        // Remove all previous pins for this phone number in this group (normalize)
+        try {
+          const usersSnapshot = await get(dbRef(db, `groups/${safeGroupId}/users`));
+          const val = usersSnapshot.val() || {};
+          for (const k of Object.keys(val)) {
+            const otherPhone = normalizePhoneNumber(val[k]?.phone);
+            if (otherPhone && otherPhone === normalizePhoneNumber(phone) && k !== uid) {
+              try { await dbRemove(dbRef(db, `groups/${safeGroupId}/users/${k}`)); } catch(e) { console.warn('remove duplicate during watch failed', e); }
+            }
+          }
+        } catch (e) {
+          console.warn('error reading users for cleanup during watch', e);
+        }
+
         const userRef = dbRef(db, `groups/${safeGroupId}/users/${uid}`);
         dbSet(userRef, { uid, name, phone, latitude, longitude, ts: Date.now() });
 
@@ -298,7 +350,16 @@ document.addEventListener('message', (event) => {
     const usersDbRef = dbRef(db, `groups/${safeGroupId}/users`);
     const unsubscribe = onValue(usersDbRef, (snapshot) => {
       const val = snapshot.val() || {};
-      const arr = Object.keys(val).map((k) => ({ uid: k, ...val[k] }));
+      // Deduplicate by normalized phone number, keep the latest ts
+      const byPhone = {};
+      for (const k of Object.keys(val)) {
+        const item = { uid: k, ...val[k] };
+        const p = normalizePhoneNumber(item.phone) || item.phone || k;
+        if (!byPhone[p] || (item.ts && item.ts > (byPhone[p].ts || 0))) {
+          byPhone[p] = item;
+        }
+      }
+      const arr = Object.keys(byPhone).map(k => byPhone[k]);
       setUsers(arr);
       sendToWebview({ type: "USERS", users: arr });
     });
