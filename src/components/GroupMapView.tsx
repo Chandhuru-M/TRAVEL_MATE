@@ -7,7 +7,7 @@ import {
   View,
   Text,
   TextInput,
-  Button,
+  // Button,
   Switch,
   StyleSheet,
   SafeAreaView,
@@ -15,6 +15,8 @@ import {
   TouchableOpacity,
   ScrollView,
 } from "react-native";
+import { useTheme } from '@/context/ThemeContext';
+import { colors } from '@/constants/Colors';
 import { WebView } from "react-native-webview";
 import * as Location from "expo-location";
 import * as Speech from "expo-speech";
@@ -92,6 +94,7 @@ const categoryMap = {
 };
 
 export default function GroupMapView({ onLeave }: { onLeave: () => void }) {
+  const { theme } = useTheme();
   const [groupId, setGroupId] = useState("team@example.com");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -472,57 +475,57 @@ document.addEventListener('message', (event) => {
   return (
     <SafeAreaView style={{ flex: 1 }}>
       {!joined ? (
-        <View style={styles.joinContainer}>
-          <Text style={styles.h1}>Join a Group</Text>
+        <View style={[styles.joinContainer, { backgroundColor: colors.card[theme] }] }>
+          <Text style={[styles.h1, { color: colors.text[theme], fontSize: 22 }]}>Join a Group</Text>
           <TextInput
             placeholder="Group ID (email)"
+            placeholderTextColor={colors.textMuted[theme]}
             value={groupId}
             onChangeText={setGroupId}
-            style={styles.input}
+            style={[styles.input, { fontSize: 18, color: colors.text[theme], borderColor: colors.border?.[theme] || '#444' }]}
           />
           <TextInput
             placeholder="Your display name"
+            placeholderTextColor={colors.textMuted[theme]}
             value={name}
             onChangeText={setName}
-            style={styles.input}
+            style={[styles.input, { fontSize: 18, color: colors.text[theme], borderColor: colors.border?.[theme] || '#444' }]}
           />
           <TextInput
             placeholder="Phone number"
+            placeholderTextColor={colors.textMuted[theme]}
             value={phone}
             onChangeText={setPhone}
-            style={styles.input}
+            style={[styles.input, { fontSize: 18, color: colors.text[theme], borderColor: colors.border?.[theme] || '#444' }]}
           />
-          <Button title="Join Group" onPress={joinGroup} />
+          <TouchableOpacity onPress={joinGroup} style={[styles.largeButton, { backgroundColor: colors.primary[theme] }] }>
+            <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700' }}>Join Group</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <View style={{ flex: 1 }}>
-          <View style={styles.header}>
-            <Text style={styles.headerText}>Group: {groupId}</Text>
+          <View style={[styles.header, { backgroundColor: colors.card[theme] }] }>
+            <Text style={[styles.headerText, { color: colors.text[theme], fontSize: 16 }]}>Group: {groupId}</Text>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ marginRight: 8 }}>{isSharing ? "Sharing" : "Hidden"}</Text>
+              <Text style={{ marginRight: 8, color: colors.text[theme] }}>{isSharing ? "Sharing" : "Hidden"}</Text>
               <Switch value={isSharing} onValueChange={setIsSharing} />
             </View>
-            <Button title="Leave" onPress={leaveGroup} />
+            <TouchableOpacity onPress={leaveGroup} style={[styles.smallButton, { backgroundColor: colors.primary[theme] }] }>
+              <Text style={{ color: '#fff', fontWeight: '700' }}>Leave</Text>
+            </TouchableOpacity>
           </View>
 
-          <View style={styles.searchBox}>
+          <View style={[styles.searchBox, { backgroundColor: colors.card[theme] }] }>
             <TextInput
               placeholder="Search (hospital, hotel, etc)"
+              placeholderTextColor={colors.textMuted[theme]}
               value={searchQuery}
               onChangeText={setSearchQuery}
-              style={styles.searchInput}
+              style={[styles.searchInput, { fontSize: 16, color: colors.text[theme], borderColor: colors.border?.[theme] || '#444' }]}
             />
-            <Button
-              title="Go"
-              onPress={() => {
-                if (currentLocation)
-                  fetchPlaces(
-                    currentLocation.latitude,
-                    currentLocation.longitude,
-                    searchQuery
-                  );
-              }}
-            />
+            <TouchableOpacity style={[styles.smallButton, { backgroundColor: colors.primary[theme] }]} onPress={() => { if (currentLocation) fetchPlaces(currentLocation.latitude, currentLocation.longitude, searchQuery); }}>
+              <Text style={{ color: '#fff', fontWeight: '700' }}>Go</Text>
+            </TouchableOpacity>
           </View>
 
           <WebView
@@ -624,15 +627,17 @@ document.addEventListener('message', (event) => {
 }
 
 const styles = StyleSheet.create({
-  joinContainer: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
-  h1: { fontSize: 20, marginBottom: 20, fontWeight: "bold" },
-  input: { borderWidth: 1, borderColor: "#ccc", width: "100%", marginBottom: 10, padding: 8, borderRadius: 5 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 10, backgroundColor: "#eee" },
-  headerText: { fontSize: 14, fontWeight: "bold" },
-  searchBox: { flexDirection: "row", padding: 10, backgroundColor: "#f9f9f9", alignItems: "center" },
-  searchInput: { borderWidth: 1, borderColor: "#ccc", flex: 1, marginRight: 10, padding: 8, borderRadius: 5 },
-  fab: { position: "absolute", bottom: 80, right: 20, backgroundColor: "#007AFF", padding: 14, borderRadius: 50, justifyContent: "center", alignItems: "center", elevation: 5 },
-  instructionBox: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "white", padding: 12, borderTopLeftRadius: 12, borderTopRightRadius: 12, shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 5 },
-  closeBtn: { position: "absolute", top: 4, right: 8 },
+  joinContainer: { flex: 1, justifyContent: "center", alignItems: "center", padding: 24 },
+  h1: { fontSize: 24, marginBottom: 20, fontWeight: "bold" },
+  input: { borderWidth: 1, borderColor: "#ccc", width: "100%", marginBottom: 12, padding: 12, borderRadius: 8 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 12 },
+  headerText: { fontSize: 16, fontWeight: "bold" },
+  searchBox: { flexDirection: "row", padding: 12, alignItems: "center" },
+  searchInput: { borderWidth: 1, borderColor: "#ccc", flex: 1, marginRight: 10, padding: 10, borderRadius: 8 },
+  fab: { position: "absolute", bottom: 88, right: 20, backgroundColor: "#007AFF", padding: 16, borderRadius: 50, justifyContent: "center", alignItems: "center", elevation: 6 },
+  instructionBox: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "white", padding: 16, borderTopLeftRadius: 12, borderTopRightRadius: 12, shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 6 },
+  closeBtn: { position: "absolute", top: 6, right: 10 },
+  largeButton: { paddingVertical: 14, paddingHorizontal: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', width: '100%', marginTop: 8 },
+  smallButton: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
 });
 
