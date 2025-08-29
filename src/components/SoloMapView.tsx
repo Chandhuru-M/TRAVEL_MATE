@@ -39,7 +39,7 @@ const MAP_HTML = (token: string) => `
 </html>
 `;
 
-interface Dest { latitude: number; longitude: number; name?: string }
+interface Dest { latitude?: number; longitude?: number; address?: string; name?: string }
 
 export default function SoloMapView({ dest }: { dest?: Dest }) {
   const webRef = useRef<any>(null);
@@ -56,34 +56,63 @@ export default function SoloMapView({ dest }: { dest?: Dest }) {
         const loc = await Location.getCurrentPositionAsync({});
         post({ type: 'CENTER', center: [loc.coords.longitude, loc.coords.latitude], zoom: 14 });
         // If a destination was provided, fetch route and send to webview
+        let finalDest: { latitude: number; longitude: number } | null = null;
         if (dest) {
+          if (typeof dest.latitude === 'number' && typeof dest.longitude === 'number') {
+            finalDest = { latitude: dest.latitude, longitude: dest.longitude };
+          } else if (dest.address) {
+            // geocode the address using Mapbox Geocoding API
+            try {
+              const q = encodeURIComponent(dest.address);
+              const geoUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${q}.json?access_token=${MAPBOX_TOKEN}&limit=1&proximity=${loc.coords.longitude},${loc.coords.latitude}`;
+              const gres = await axios.get(geoUrl);
+              const feat = (gres.data as any)?.features?.[0];
+              if (feat && feat.center && feat.center.length === 2) {
+                finalDest = { latitude: feat.center[1], longitude: feat.center[0] };
+              }
+            } catch (e) { console.warn('geocode failed', e); }
+          }
+        }
+
+        if (finalDest) {
           try {
-            const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${loc.coords.longitude},${loc.coords.latitude};${dest.longitude},${dest.latitude}?geometries=geojson&steps=false&access_token=${MAPBOX_TOKEN}`;
+            const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${loc.coords.longitude},${loc.coords.latitude};${finalDest.longitude},${finalDest.latitude}?geometries=geojson&steps=false&access_token=${MAPBOX_TOKEN}`;
             const res = await axios.get(url);
             const route = (res.data as any)?.routes?.[0]?.geometry;
             if (route) {
-              post({ type: 'ROUTE', route, start: [loc.coords.longitude, loc.coords.latitude], end: [dest.longitude, dest.latitude] });
+              post({ type: 'ROUTE', route, start: [loc.coords.longitude, loc.coords.latitude], end: [finalDest.longitude, finalDest.latitude] });
             }
           } catch (e) { console.warn('solo route fetch failed', e); }
         }
         watchRef.current = await Location.watchPositionAsync({ accuracy: Location.Accuracy.Highest, distanceInterval: 5, timeInterval: 4000 }, (pos: any) => {
           post({ type: 'USER_LOC', center: [pos.coords.longitude, pos.coords.latitude] });
           // If destination present, also update route live (optional): compute new route
-          if (dest) {
-            (async () => {
-              try {
-                const url2 = `https://api.mapbox.com/directions/v5/mapbox/driving/${pos.coords.longitude},${pos.coords.latitude};${dest.longitude},${dest.latitude}?geometries=geojson&steps=false&access_token=${MAPBOX_TOKEN}`;
+          (async () => {
+            try {
+              let updateDest = finalDest;
+              if (!updateDest && dest?.address) {
+                // try geocode once more based on latest pos
+                try {
+                  const q2 = encodeURIComponent(dest.address);
+                  const geoUrl2 = `https://api.mapbox.com/geocoding/v5/mapbox.places/${q2}.json?access_token=${MAPBOX_TOKEN}&limit=1&proximity=${pos.coords.longitude},${pos.coords.latitude}`;
+                  const gres2 = await axios.get(geoUrl2);
+                  const feat2 = (gres2.data as any)?.features?.[0];
+                  if (feat2 && feat2.center && feat2.center.length === 2) updateDest = { latitude: feat2.center[1], longitude: feat2.center[0] };
+                } catch (e) { /* ignore */ }
+              }
+              if (updateDest) {
+                const url2 = `https://api.mapbox.com/directions/v5/mapbox/driving/${pos.coords.longitude},${pos.coords.latitude};${updateDest.longitude},${updateDest.latitude}?geometries=geojson&steps=false&access_token=${MAPBOX_TOKEN}`;
                 const r2 = await axios.get(url2);
                 const rt = (r2.data as any)?.routes?.[0]?.geometry;
-                if (rt) post({ type: 'ROUTE', route: rt, start: [pos.coords.longitude, pos.coords.latitude], end: [dest.longitude, dest.latitude] });
-              } catch (e) { /* ignore route update errors */ }
-            })();
-          }
+                if (rt) post({ type: 'ROUTE', route: rt, start: [pos.coords.longitude, pos.coords.latitude], end: [updateDest.longitude, updateDest.latitude] });
+              }
+            } catch (e) { /* ignore route update errors */ }
+          })();
         });
       } catch (e) { console.warn('solo map loc error', e); }
     })();
     return () => { mounted = false; if (watchRef.current?.remove) watchRef.current.remove(); };
-  }, [post]);
+  }, [post, dest]);
 
   return (
     <View style={styles.container}>
