@@ -46,4 +46,7 @@ export default function Payment() {
   );
 }
 
-const styles = StyleSheet.create({ payButton: { backgroundColor: '#007AFF', padding: 14, borderRadius: 10, marginTop: 20, alignItems: 'center' } });
+const styles = StyleSheet.create({
+  // Move the button up by 1 inch (about 24px)
+  payButton: { backgroundColor: '#007AFF', padding: 14, borderRadius: 10, marginTop: 20, alignItems: 'center', marginBottom: 48 }
+});
