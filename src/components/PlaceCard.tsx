@@ -5,6 +5,7 @@ import { Place } from '@/lib/types';
 import { FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { fetchPlaceDetails } from '@/lib/foursquare';
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import { useTripStore } from '@/services/tripService';
@@ -54,14 +55,38 @@ export default function PlaceCard({ place, style }: PlaceCardProps) {
     }
   };
 
-  const handlePin = () => {
+  const handlePin = async () => {
     // navigate to map and instruct SoloMapView to show directions
     try {
-  const lat = (place as any).latitude ?? (place.location as any)?.lat ?? (place.location as any)?.latitude ?? (place as any).lat ?? null;
-  const lon = (place as any).longitude ?? (place.location as any)?.lon ?? (place.location as any)?.longitude ?? (place as any).lon ?? null;
-  if (!lat || !lon) { Alert.alert('Location unavailable', 'This place does not have coordinates to navigate to.'); return; }
-  const payload = encodeURIComponent(JSON.stringify({ latitude: lat, longitude: lon, name: place.name }));
-      router.push(`/map?solo=${payload}` as any);
+      const lat = (place as any).latitude ?? (place.location as any)?.lat ?? (place.location as any)?.latitude ?? (place as any).lat ?? null;
+      const lon = (place as any).longitude ?? (place.location as any)?.lon ?? (place.location as any)?.longitude ?? (place as any).lon ?? null;
+
+      let finalLat = lat;
+      let finalLon = lon;
+
+      // If no coords but we have a fsq_id, try fetching details from Foursquare
+      if ((!finalLat || !finalLon) && (place as any).fsq_id) {
+        try {
+          const details = await fetchPlaceDetails((place as any).fsq_id);
+          const res = details?.result || details || {};
+          finalLat = finalLat || (res?.geocodes?.main?.latitude) || (res?.location?.latitude) || finalLat;
+          finalLon = finalLon || (res?.geocodes?.main?.longitude) || (res?.location?.longitude) || finalLon;
+        } catch (e) {
+          console.warn('fetchPlaceDetails failed', e);
+        }
+      }
+
+      if (finalLat && finalLon) {
+        const payload = encodeURIComponent(JSON.stringify({ latitude: finalLat, longitude: finalLon, name: place.name }));
+        router.push(`/map?solo=${payload}` as any);
+        return;
+      }
+
+      // Fallback: send address (SoloMapView will geocode it)
+      const addr = (place as any).location?.formatted_address || (place as any).location?.address || place.name;
+      if (!addr) { Alert.alert('Location unavailable', 'This place does not have coordinates or an address to navigate to.'); return; }
+      const payload2 = encodeURIComponent(JSON.stringify({ address: addr, name: place.name }));
+      router.push(`/map?solo=${payload2}` as any);
     } catch (e) {
       console.warn('pin navigation failed', e);
       Alert.alert('Unable to open map');
