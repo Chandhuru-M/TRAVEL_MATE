@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, StyleSheet, Alert } from 'react-native';
 import { WebView } from 'react-native-webview';
+import axios from 'axios';
 import * as Location from 'expo-location';
 
 const MAPBOX_TOKEN = 'pk.eyJ1Ijoic291bmRoYXJ5YSIsImEiOiJjbWU4MG0zZHcwNXJ5MmpxeGRxYW1sdWU4In0.R1lZA658526l1ZF2VxGG-w';
@@ -38,7 +39,9 @@ const MAP_HTML = (token: string) => `
 </html>
 `;
 
-export default function SoloMapView() {
+interface Dest { latitude: number; longitude: number; name?: string }
+
+export default function SoloMapView({ dest }: { dest?: Dest }) {
   const webRef = useRef<any>(null);
   const watchRef = useRef<any | null>(null);
 
@@ -52,8 +55,30 @@ export default function SoloMapView() {
       try {
         const loc = await Location.getCurrentPositionAsync({});
         post({ type: 'CENTER', center: [loc.coords.longitude, loc.coords.latitude], zoom: 14 });
+        // If a destination was provided, fetch route and send to webview
+        if (dest) {
+          try {
+            const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${loc.coords.longitude},${loc.coords.latitude};${dest.longitude},${dest.latitude}?geometries=geojson&steps=false&access_token=${MAPBOX_TOKEN}`;
+            const res = await axios.get(url);
+            const route = (res.data as any)?.routes?.[0]?.geometry;
+            if (route) {
+              post({ type: 'ROUTE', route, start: [loc.coords.longitude, loc.coords.latitude], end: [dest.longitude, dest.latitude] });
+            }
+          } catch (e) { console.warn('solo route fetch failed', e); }
+        }
         watchRef.current = await Location.watchPositionAsync({ accuracy: Location.Accuracy.Highest, distanceInterval: 5, timeInterval: 4000 }, (pos: any) => {
           post({ type: 'USER_LOC', center: [pos.coords.longitude, pos.coords.latitude] });
+          // If destination present, also update route live (optional): compute new route
+          if (dest) {
+            (async () => {
+              try {
+                const url2 = `https://api.mapbox.com/directions/v5/mapbox/driving/${pos.coords.longitude},${pos.coords.latitude};${dest.longitude},${dest.latitude}?geometries=geojson&steps=false&access_token=${MAPBOX_TOKEN}`;
+                const r2 = await axios.get(url2);
+                const rt = (r2.data as any)?.routes?.[0]?.geometry;
+                if (rt) post({ type: 'ROUTE', route: rt, start: [pos.coords.longitude, pos.coords.latitude], end: [dest.longitude, dest.latitude] });
+              } catch (e) { /* ignore route update errors */ }
+            })();
+          }
         });
       } catch (e) { console.warn('solo map loc error', e); }
     })();

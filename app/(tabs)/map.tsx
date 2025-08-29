@@ -7,11 +7,21 @@ import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import GroupMapView from '@/components/GroupMapView'; // Import the group map component
 import SoloMapView from '@/components/SoloMapView';
+import { useLocalSearchParams } from 'expo-router';
 
 export default function MapScreen() {
   const { theme } = useTheme();
-  const [mode, setMode] = useState<'group' | 'solo'>('group');
+  const params = useLocalSearchParams() as any;
+  const initialSolo = params?.solo ? true : false;
+  const [mode, setMode] = useState<'group' | 'solo'>(initialSolo ? 'solo' : 'group');
   const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  let dest: { latitude: number; longitude: number; name?: string } | undefined = undefined;
+  if (params?.solo) {
+    try {
+      dest = JSON.parse(decodeURIComponent(params.solo));
+    } catch (e) { dest = undefined; }
+  }
 
   const toggleMode = (next: 'group' | 'solo') => {
     Animated.timing(fadeAnim, { toValue: 0, duration: 250, useNativeDriver: true }).start(() => {
@@ -28,7 +38,7 @@ export default function MapScreen() {
           {mode === 'group' ? (
             <GroupMapView onLeave={() => {}} />
           ) : (
-            <SoloMapView />
+            <SoloMapView dest={dest} />
           )}
         </Animated.View>
 
