@@ -159,12 +159,13 @@ export default function FuelScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f172a' },
-  content: { flex: 1, paddingHorizontal: 20 },
+  content: { flex: 1, paddingHorizontal: 20, justifyContent: 'flex-start', paddingTop: 10 },
   controlsContainer: {
-    padding: 16,
+    padding: 10,
     backgroundColor: '#1e293b',
     borderRadius: 12,
     marginVertical: 0,
+    marginTop: 0,
   },
   toggleContainer: {
     flexDirection: 'row',
@@ -203,7 +204,8 @@ const styles = StyleSheet.create({
   recommendationHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 10,
+    marginTop: 10,
   },
   recommendationTitle: {
     color: '#facc15',

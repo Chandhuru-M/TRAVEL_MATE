@@ -8,7 +8,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import { FontAwesome } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { fetchPlaces, fetchPlacesNearby, getDeviceLocation } from '@/lib/foursquare'; // 1. Import the real API fetch functions
+import { fetchPlaces, fetchPlacesNearby, getDeviceLocation, fetchPlaceDetails } from '@/lib/foursquare'; // 1. Import the real API fetch functions
 import { Place } from '@/lib/types';
 // location is handled in the foursquare helper now
 import { useTripStore } from '@/services/tripService';
@@ -77,6 +77,21 @@ export default function HomeScreen() {
   const [places, setPlaces] = useState<Place[]>([]);
   const [restaurants, setRestaurants] = useState<Place[]>([]);
   const [hotels, setHotels] = useState<Place[]>([]);
+  const [categoryPlaces, setCategoryPlaces] = useState<Record<string, Place[]>>({});
+  const CATEGORY_DEFS = [
+    { key: 'attractions', title: 'Attractions' },
+    { key: 'restaurants', title: 'Top-Rated Restaurants' },
+    { key: 'cafes', title: 'Cafes' },
+    { key: 'bars', title: 'Bars & Nightlife' },
+    { key: 'shopping', title: 'Shopping' },
+  { key: 'parks', title: 'Parks & Outdoors' },
+  { key: 'petrol', title: 'Petrol Stations' },
+  { key: 'banks', title: 'Banks & ATMs' },
+  { key: 'museums', title: 'Museums & Galleries' },
+  { key: 'hospitals', title: 'Hospitals' },
+  { key: 'pharmacy', title: 'Pharmacies' },
+  { key: 'textiles', title: 'Textiles & Fabrics' },
+  ];
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const HOTELS_KEY = 'hotels_cache_v1';
@@ -91,7 +106,12 @@ export default function HomeScreen() {
         const raw = await AsyncStorage.getItem(HOTELS_KEY);
         if (raw) {
           const parsed: Place[] = JSON.parse(raw);
-          setHotels(parsed);
+          // Normalize cached items so they always have an identifier field
+          const normalized = parsed.map((it: any) => ({
+            ...it,
+            fsq_id: it.fsq_id || it.fsq_place_id || it.id,
+          }));
+          setHotels(normalized);
         }
       } catch (e) {
         console.warn('Failed to load cached hotels:', e);
@@ -100,7 +120,8 @@ export default function HomeScreen() {
 
     const cacheHotels = async (items: Place[]) => {
       try {
-        await AsyncStorage.setItem(HOTELS_KEY, JSON.stringify(items || []));
+  const normalized = (items || []).map((it: any) => ({ ...it, fsq_id: it.fsq_id || it.fsq_place_id || it.id }));
+  await AsyncStorage.setItem(HOTELS_KEY, JSON.stringify(normalized));
       } catch (e) {
         console.warn('Failed to cache hotels:', e);
       }
@@ -137,20 +158,64 @@ export default function HomeScreen() {
         const { latitude, longitude } = await getDeviceLocation();
         console.log('[Home] device coords', { latitude, longitude });
 
-        // Fetch hotels (persistent): try fallback strategy
-        const fetchedHotels = await tryFetchWithFallback(latitude, longitude, 'hotel');
-        if (fetchedHotels.length > 0) {
-          setHotels(fetchedHotels);
-          cacheHotels(fetchedHotels);
-        }
+        // Per-category query lists
+        const popularQueries = ['tourist attraction', 'point of interest', 'attraction', 'sight', 'things to do', 'popular places'];
+        const restaurantQueries = ['restaurant', 'food', 'dining', 'cafe'];
 
-        // Fetch popular places (use fallback)
-        const fetchedPopular = await tryFetchWithFallback(latitude, longitude, 'popular places');
-        setPlaces(fetchedPopular);
+        
 
-        // Fetch restaurants specifically
-        const fetchedRestaurants = await tryFetchWithFallback(latitude, longitude, 'restaurant');
-        setRestaurants(fetchedRestaurants);
+        // Seven category definitions to display on Home
+        const categoryDefs = [
+          { key: 'attractions', title: 'Attractions', queries: ['tourist attraction', 'point of interest', 'attraction', 'sight', 'things to do'] },
+          { key: 'restaurants', title: 'Top-Rated Restaurants', queries: ['restaurant', 'food', 'dining', 'cafe'] },
+          { key: 'cafes', title: 'Cafes', queries: ['cafe', 'coffee', 'tea'] },
+          { key: 'bars', title: 'Bars & Nightlife', queries: ['bar', 'pub', 'nightlife'] },
+          { key: 'shopping', title: 'Shopping', queries: ['shopping', 'mall', 'market'] },
+          { key: 'parks', title: 'Parks & Outdoors', queries: ['park', 'garden', 'outdoor'] },
+          { key: 'petrol', title: 'Petrol Stations', queries: ['petrol station', 'gas station', 'fuel station', 'petrol'] },
+          { key: 'banks', title: 'Banks & ATMs', queries: ['bank', 'atm', 'cash machine', 'bank branch'] },
+          { key: 'museums', title: 'Museums & Galleries', queries: ['museum', 'gallery', 'exhibit'] },
+          { key: 'hospitals', title: 'Hospitals', queries: ['hospital', 'medical center', 'clinic', 'healthcare'] },
+          { key: 'pharmacy', title: 'Pharmacies', queries: ['pharmacy', 'chemist', 'drugstore', 'pharmacie'] },
+          { key: 'textiles', title: 'Textiles & Fabrics', queries: ['textile', 'fabric store', 'fabrics', 'cloth shop'] },
+        ];
+
+        const fetchFirstMatch = async (queries: string[]) => {
+          const radii = [5000, 10000, 20000];
+          for (const q of queries) {
+            for (const r of radii) {
+              try {
+                const res = await fetchPlaces({ lat: latitude, lon: longitude, query: q, radius: r, limit: 20 });
+                if (res && res.length > 0) return res;
+              } catch (e) {
+                // continue
+              }
+            }
+          }
+          return [] as Place[];
+        };
+
+        // Fetch each category (limited detail lookups per category)
+        const categoryResults = await Promise.all(categoryDefs.map(async (c) => {
+          const raw = await fetchFirstMatch(c.queries);
+          const normalized = (raw || []).map((it: any) => ({ ...it, fsq_id: it.fsq_id || it.fsq_place_id || it.id }));
+          const toFetch = normalized.slice(0, 8);
+          const detailed = await Promise.all(toFetch.map(async (p: any) => {
+            if (!p.fsq_id) return p;
+            try {
+              const d = await fetchPlaceDetails(p.fsq_id);
+              const res = d?.result || d;
+              return { ...p, rating: res?.rating ?? p.rating, price: res?.price ?? p.price, photos: res?.photos ?? p.photos, description: res?.description ?? p.description, distance: p.distance };
+            } catch (e) {
+              return p;
+            }
+          }));
+          return { key: c.key, title: c.title, items: detailed };
+        }));
+
+        const map: Record<string, Place[]> = {};
+        for (const r of categoryResults) map[r.key] = r.items;
+        setCategoryPlaces(map);
 
       } catch (locErr: any) {
         console.error('places fetch error:', locErr);
@@ -200,28 +265,40 @@ export default function HomeScreen() {
   };
 
   const renderContent = () => {
-    // Always show cached hotels immediately if available
-    const showHotels = hotels && hotels.length > 0;
+    if (loading) {
+      return <ActivityIndicator size="large" color={colors.primary[theme]} style={{ marginTop: 24 }} />;
+    }
 
-    return (
-      <>
-        {showHotels && <CategoryCarousel title="Hotels Near You" places={hotels} />}
+    if (error) {
+      return <Text style={styles.errorText}>{error}</Text>;
+    }
 
-        {loading ? (
-          <ActivityIndicator size="large" color={colors.primary[theme]} style={{ marginTop: 24 }} />
-        ) : error ? (
-          <Text style={styles.errorText}>{error}</Text>
-        ) : places && places.length > 0 ? (
-          <>
-            <CategoryCarousel title="Popular Near You" places={places} />
-            <CategoryCarousel title="Top-Rated Restaurants" places={reversedRestaurants} />
-          </>
-        ) : (
-          // no places found but hotels may still be visible above
-          <Text style={[styles.errorText, { color: colors.textMuted[theme] }]}>No places found nearby.</Text>
-        )}
-      </>
-    );
+    // If we have category data, render the 7 category carousels in order
+    if (Object.keys(categoryPlaces).length > 0) {
+      return (
+        <>
+          {CATEGORY_DEFS.map(c => (
+            <React.Fragment key={c.key}>
+              {(categoryPlaces[c.key] || []).length > 0 && (
+                <CategoryCarousel title={c.title} places={categoryPlaces[c.key]} />
+              )}
+            </React.Fragment>
+          ))}
+        </>
+      );
+    }
+
+    // Fallback: older single lists
+    if (places && places.length > 0) {
+      return (
+        <>
+          <CategoryCarousel title="Popular Near You" places={places} />
+          <CategoryCarousel title="Top-Rated Restaurants" places={reversedRestaurants} />
+        </>
+      );
+    }
+
+    return <Text style={[styles.errorText, { color: colors.textMuted[theme] }]}>No places found nearby.</Text>;
   };
 
   return (
