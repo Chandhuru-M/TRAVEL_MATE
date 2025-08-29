@@ -42,6 +42,28 @@ async function fsqSearch(params: Record<string, string>) {
   }
 }
 
+// Fetch a single place's full details (used to fill missing coordinates)
+async function fsqGetPlace(fsq_id: string): Promise<any> {
+  ensureKey();
+  const url = `${BASE}/places/${encodeURIComponent(fsq_id)}`;
+  const headers = {
+    accept: 'application/json',
+    Authorization: `Bearer ${SERVICE_KEY}`,
+    'X-Places-Api-Version': API_VERSION,
+  } as Record<string, string>;
+  try {
+  const res = await axios.get(url, { headers });
+  return res.data as any;
+  } catch (err: any) {
+    if (err.response) {
+      console.error('[fsqGetPlace] Error:', err.response.status, err.response.data);
+    } else {
+      console.error('[fsqGetPlace] Request failed:', err.message);
+    }
+    return null;
+  }
+}
+
 interface FetchPlacesParams {
   lat: number;
   lon: number;
@@ -64,21 +86,40 @@ export async function fetchPlaces(params: FetchPlacesParams): Promise<Place[]> {
   const results = data.results || [];
   console.log('[fetchPlaces] searchParams:', searchParams, 'resultsCount:', results.length);
 
-  // Map Foursquare response to the mobile Place type
-  const places: Place[] = results.map((p: any) => ({
-    fsq_id: p.fsq_id,
-    name: p.name,
-    // mobile expects categories as array of objects with name
-    categories: (p.categories || []).map((c: any) => ({ name: c.name })),
-    distance: p.distance,
-    location: {
-      formatted_address: p.location?.formatted_address || p.location?.formatted || 'No address',
-      ...p.location,
-    },
-    geocodes: p.geocodes,
-    rating: p.rating ?? undefined,
-    price: p.price ?? undefined,
-    photos: p.photos ?? undefined,
+  // Map Foursquare response to the mobile Place type.
+  // If coordinates are missing, fetch details to obtain exact geocodes for that FSQ place.
+  const places: Place[] = await Promise.all(results.map(async (p: any) => {
+    let lat = p?.geocodes?.main?.latitude ?? p?.geocodes?.main?.lat;
+    let lng = p?.geocodes?.main?.longitude ?? p?.geocodes?.main?.lng;
+    if ((lat == null || lng == null) && p?.fsq_id) {
+      const detail: any = await fsqGetPlace(p.fsq_id);
+      if (detail?.geocodes?.main) {
+        lat = detail.geocodes.main.latitude ?? detail.geocodes.main.lat;
+        lng = detail.geocodes.main.longitude ?? detail.geocodes.main.lng;
+      }
+      if (lat == null && (detail?.location?.lat != null)) lat = detail.location.lat;
+      if (lng == null && (detail?.location?.lng != null)) lng = detail.location.lng;
+    }
+    const place: Place = {
+      fsq_id: p.fsq_id,
+      name: p.name,
+      // mobile expects categories as array of objects with name
+      categories: (p.categories || []).map((c: any) => ({ name: c.name })),
+      distance: p.distance,
+      location: {
+        formatted_address: p.location?.formatted_address || p.location?.formatted || 'No address',
+        ...p.location,
+      },
+      // Normalize geocodes to { lat, lng } for our Place type
+      geocodes: (typeof lat === 'number' && typeof lng === 'number') ? { main: { lat, lng } } : undefined,
+      // Also expose convenience top-level coords used by some screens
+      latitude: (typeof lat === 'number') ? lat : undefined,
+      longitude: (typeof lng === 'number') ? lng : undefined,
+      rating: p.rating ?? undefined,
+      price: p.price ?? undefined,
+      photos: p.photos ?? undefined,
+    } as Place;
+    return place;
   }));
 
   return places;
@@ -141,4 +182,29 @@ export async function getDeviceLocation(): Promise<{ latitude: number; longitude
 
   if (!loc || !loc.coords) throw new Error('Current location is unavailable');
   return { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+}
+
+// Public helper to fetch a single place and map to our Place type
+export async function getPlaceById(fsq_id: string): Promise<Place | null> {
+  const detail: any = await fsqGetPlace(fsq_id)
+  if (!detail) return null
+  const lat = detail?.geocodes?.main?.latitude ?? detail?.geocodes?.main?.lat
+  const lng = detail?.geocodes?.main?.longitude ?? detail?.geocodes?.main?.lng
+  const place: Place = {
+    fsq_id: detail.fsq_id,
+    name: detail.name,
+    categories: (detail.categories || []).map((c: any) => ({ name: c.name })),
+    distance: detail.distance,
+    location: {
+      formatted_address: detail.location?.formatted_address || detail.location?.formatted || 'No address',
+      ...detail.location,
+    },
+    geocodes: (typeof lat === 'number' && typeof lng === 'number') ? { main: { lat, lng } } : undefined,
+    latitude: (typeof lat === 'number') ? lat : undefined,
+    longitude: (typeof lng === 'number') ? lng : undefined,
+    rating: detail.rating ?? undefined,
+    price: detail.price ?? undefined,
+    photos: detail.photos ?? undefined,
+  }
+  return place
 }
