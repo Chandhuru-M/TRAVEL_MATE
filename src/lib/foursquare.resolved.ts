@@ -1,15 +1,36 @@
-// Helper: Foursquare search API
+// src/lib/foursquare.ts (RESOLVED)
+import axios from 'axios';
+import { Place } from './types';
+import * as Location from 'expo-location';
+
+// Read service key and version from env (Expo should replace these at build time)
+const SERVICE_KEY = process.env.EXPO_PUBLIC_FOURSQUARE_API_KEY;
+const API_VERSION = process.env.EXPO_PUBLIC_FOURSQUARE_API_VERSION || '2025-06-17';
+
+const BASE = 'https://places-api.foursquare.com';
+
+function ensureKey() {
+  if (!SERVICE_KEY) {
+    throw new Error('Foursquare Service Key is missing from .env file.');
+  }
+}
+
 async function fsqSearch(params: Record<string, string>) {
   ensureKey();
   const qs = new URLSearchParams(params).toString();
   const url = `${BASE}/places/search?${qs}`;
+
   const headers = {
     accept: 'application/json',
     Authorization: `Bearer ${SERVICE_KEY}`,
     'X-Places-Api-Version': API_VERSION,
   } as Record<string, string>;
+
   try {
+    console.log('[fsqSearch] GET', url);
+    console.log('[fsqSearch] headers:', { 'Authorization': 'Bearer ****', 'X-Places-Api-Version': API_VERSION });
     const res = await axios.get(url, { headers });
+    console.log('[fsqSearch] status', res.status, 'bodyKeys', Object.keys(res.data || {}).slice(0,6));
     return res.data;
   } catch (err: any) {
     if (err.response) {
@@ -21,7 +42,7 @@ async function fsqSearch(params: Record<string, string>) {
   }
 }
 
-// Helper: Get full place details by fsq_id
+// Fetch a single place's full details (used to fill missing coordinates)
 async function fsqGetPlace(fsq_id: string): Promise<any> {
   ensureKey();
   const url = `${BASE}/places/${encodeURIComponent(fsq_id)}`;
@@ -43,29 +64,12 @@ async function fsqGetPlace(fsq_id: string): Promise<any> {
   }
 }
 
-// Type for fetchPlaces params
 interface FetchPlacesParams {
   lat: number;
   lon: number;
   query?: string;
   limit?: number;
   radius?: number;
-}
-// src/lib/foursquare.ts
-import axios from 'axios';
-import { Place } from './types';
-import * as Location from 'expo-location';
-
-// Read service key and version from env (Expo should replace these at build time)
-const SERVICE_KEY = process.env.EXPO_PUBLIC_FOURSQUARE_API_KEY;
-const API_VERSION = process.env.EXPO_PUBLIC_FOURSQUARE_API_VERSION || '2025-06-17';
-
-const BASE = 'https://places-api.foursquare.com';
-
-function ensureKey() {
-  if (!SERVICE_KEY) {
-    throw new Error('Foursquare Service Key is missing from .env file.');
-  }
 }
 
 export async function fetchPlaces(params: FetchPlacesParams): Promise<Place[]> {
@@ -85,7 +89,8 @@ export async function fetchPlaces(params: FetchPlacesParams): Promise<Place[]> {
     console.log('[fetchPlaces] firstResultKeys:', Object.keys(results[0]).slice(0, 20));
   }
 
-  // Robust mapping: fetch missing coordinates if needed
+  // Map Foursquare response to the mobile Place type.
+  // If coordinates are missing, fetch details to obtain exact geocodes for that FSQ place.
   const places: Place[] = await Promise.all(results.map(async (p: any) => {
     let lat = p?.geocodes?.main?.latitude ?? p?.geocodes?.main?.lat;
     let lng = p?.geocodes?.main?.longitude ?? p?.geocodes?.main?.lng;
@@ -101,13 +106,16 @@ export async function fetchPlaces(params: FetchPlacesParams): Promise<Place[]> {
     const place: Place = {
       fsq_id: p.fsq_id || p.fsq_place_id || p.id,
       name: p.name,
+      // mobile expects categories as array of objects with name
       categories: (p.categories || []).map((c: any) => ({ name: c.name })),
       distance: p.distance,
       location: {
         formatted_address: p.location?.formatted_address || p.location?.formatted || 'No address',
         ...p.location,
       },
-      geocodes: (typeof lat === 'number' && typeof lng === 'number') ? { main: { lat, lng } } : p.geocodes,
+      // Normalize geocodes to { lat, lng } for our Place type
+      geocodes: (typeof lat === 'number' && typeof lng === 'number') ? { main: { lat, lng } } : undefined,
+      // Also expose convenience top-level coords used by some screens
       latitude: (typeof lat === 'number') ? lat : undefined,
       longitude: (typeof lng === 'number') ? lng : undefined,
       rating: p.rating ?? undefined,
@@ -204,7 +212,7 @@ export async function getPlaceById(fsq_id: string): Promise<Place | null> {
   return place
 }
 
-// Fetch detailed place information by fsq_id (raw response)
+// Also export a raw fetch for flexibility
 export async function fetchPlaceDetails(fsq_id: string): Promise<any> {
   ensureKey();
   if (!fsq_id) throw new Error('fsq_id is required');

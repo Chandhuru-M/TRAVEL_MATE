@@ -342,6 +342,17 @@ export default function HomeScreen() {
 
           {renderContent()}
 
+          <TouchableOpacity onPress={() => router.push('/fuel' as any)}>
+            <View style={[styles.ctaCard, { backgroundColor: colors.card[theme] }]}>
+              <FontAwesome name="tint" size={32} color={colors.primary[theme]} />
+              <View style={styles.ctaTextContainer}>
+                <Text style={[styles.ctaTitle, { color: colors.text[theme] }]}>Find Nearby Fuel</Text>
+                <Text style={[styles.ctaSubtitle, { color: colors.textMuted[theme] }]}>Check for gas stations</Text>
+              </View>
+              <FontAwesome name="arrow-right" size={20} color={colors.textMuted[theme]} />
+            </View>
+          </TouchableOpacity>
+
           <TouchableOpacity onPress={() => router.push('/(tabs)/trip-planner' as any)}>
             <View style={[styles.ctaCard, { backgroundColor: colors.card[theme] }]}>
               <FontAwesome name="suitcase" size={32} color={colors.primary[theme]} />
