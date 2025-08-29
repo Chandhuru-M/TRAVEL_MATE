@@ -88,6 +88,9 @@ export default function HomeScreen() {
   { key: 'petrol', title: 'Petrol Stations' },
   { key: 'banks', title: 'Banks & ATMs' },
   { key: 'museums', title: 'Museums & Galleries' },
+  { key: 'hospitals', title: 'Hospitals' },
+  { key: 'pharmacy', title: 'Pharmacies' },
+  { key: 'textiles', title: 'Textiles & Fabrics' },
   ];
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -172,6 +175,9 @@ export default function HomeScreen() {
           { key: 'petrol', title: 'Petrol Stations', queries: ['petrol station', 'gas station', 'fuel station', 'petrol'] },
           { key: 'banks', title: 'Banks & ATMs', queries: ['bank', 'atm', 'cash machine', 'bank branch'] },
           { key: 'museums', title: 'Museums & Galleries', queries: ['museum', 'gallery', 'exhibit'] },
+          { key: 'hospitals', title: 'Hospitals', queries: ['hospital', 'medical center', 'clinic', 'healthcare'] },
+          { key: 'pharmacy', title: 'Pharmacies', queries: ['pharmacy', 'chemist', 'drugstore', 'pharmacie'] },
+          { key: 'textiles', title: 'Textiles & Fabrics', queries: ['textile', 'fabric store', 'fabrics', 'cloth shop'] },
         ];
 
         const fetchFirstMatch = async (queries: string[]) => {
