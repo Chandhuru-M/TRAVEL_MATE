@@ -7,6 +7,8 @@ lng: number;
 export interface Place {
   id?: string;
   fsq_id: string;
+  // mirrors web shape
+  fsq_place_id?: string;
   name: string;
   categories: { name: string }[];
   distance?: number;
@@ -28,6 +30,11 @@ export interface Place {
   longitude?: any;
   lat?: any;
   lng?: any;
+  link?: string;
+  related_places?: any;
+  social_media?: any;
+  tel?: string;
+  website?: string;
 }
 // --- FINANCE / WALLET TYPES ---
 export interface Account {

@@ -18,7 +18,9 @@ export default function HotelCard({ hotel, onPress, showBottomWhite = false }: P
           <Image source={{ uri: hotel.image }} style={styles.image} />
           <View style={styles.info}>
             <Text style={[styles.name, { color: titleColor }]}>{hotel.name}</Text>
-            <Text style={[styles.location, { color: muted }]}>{hotel.location}</Text>
+            <Text style={[styles.location, { color: muted }]}>{hotel.location?.formatted_address ?? hotel.location ?? hotel.address}</Text>
+            {hotel.tel ? <Text style={[styles.metaSmall, { color: muted }]}>{hotel.tel}</Text> : null}
+            {hotel.website ? <Text style={[styles.metaSmall, { color: muted }]} numberOfLines={1}>{hotel.website}</Text> : null}
             <Text style={[styles.price, { color: '#11A44A' }]}>${hotel.price} <Text style={[styles.perNight, { color: muted }]}>/ night</Text></Text>
             <View style={styles.metaRow}>
               <Text style={styles.star}>⭐</Text>
@@ -47,6 +49,7 @@ const styles = StyleSheet.create({
   star: { marginRight: 6 },
   metaText: { color: '#444', fontWeight: '600' },
   safeArea: { width: '100%' },
+  metaSmall: { fontSize: 12, marginTop: 6 },
   bottomWhite: { height: 88, backgroundColor: '#fff', width: '100%', borderTopLeftRadius: 16, borderTopRightRadius: 16, marginTop: 8 },
 });
 

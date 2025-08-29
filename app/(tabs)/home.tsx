@@ -8,7 +8,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import { FontAwesome } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { fetchPlaces, fetchPlacesNearby, getDeviceLocation, fetchPlaceDetails } from '@/lib/foursquare'; // 1. Import the real API fetch functions
+import { fetchPlaces, fetchPlacesNearby, getDeviceLocation } from '@/lib/foursquare'; // 1. Import the real API fetch functions
 import { Place } from '@/lib/types';
 // location is handled in the foursquare helper now
 import { useTripStore } from '@/services/tripService';
@@ -22,7 +22,7 @@ const CategoryCarousel = ({ title, places }: { title: string; places: Place[] })
       <Text style={[styles.carouselTitle, { color: colors.text[theme] }]}>{title}</Text>
       <FlatList
         data={places}
-        renderItem={({ item }) => <PlaceCard place={item} style={styles.carouselItem} />}
+        renderItem={({ item }) => <PlaceCard place={item} style={styles.carouselItem} compact />}
         keyExtractor={(item, index) => `${item.fsq_id}-${index}`}
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -74,6 +74,7 @@ const ActiveTripBanner = () => {
 
 export default function HomeScreen() {
   const { theme } = useTheme();
+  const [weather, setWeather] = useState<{ temp?: number; wind?: number; code?: number; summary?: string } | null>(null);
   const [places, setPlaces] = useState<Place[]>([]);
   const [restaurants, setRestaurants] = useState<Place[]>([]);
   const [hotels, setHotels] = useState<Place[]>([]);
@@ -158,6 +159,35 @@ export default function HomeScreen() {
         const { latitude, longitude } = await getDeviceLocation();
         console.log('[Home] device coords', { latitude, longitude });
 
+        // Fetch current weather from Open-Meteo (no API key required)
+        (async () => {
+          try {
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&temperature_unit=celsius&windspeed_unit=kmh&timezone=auto`;
+            const resp = await fetch(url);
+            const json = await resp.json();
+            const cw = json?.current_weather;
+            if (cw) {
+              const code = Number(cw.weathercode);
+              const summary = (() => {
+                switch (code) {
+                  case 0: return 'Clear';
+                  case 1: case 2: case 3: return 'Partly cloudy';
+                  case 45: case 48: return 'Fog';
+                  case 51: case 53: case 55: return 'Drizzle';
+                  case 61: case 63: case 65: return 'Rain';
+                  case 71: case 73: case 75: return 'Snow';
+                  case 80: case 81: case 82: return 'Rain showers';
+                  case 95: case 96: case 99: return 'Thunderstorm';
+                  default: return 'Weather';
+                }
+              })();
+              setWeather({ temp: cw.temperature, wind: cw.windspeed, code, summary });
+            }
+          } catch (e) {
+            console.warn('Weather fetch failed', e);
+          }
+        })();
+
         // Per-category query lists
         const popularQueries = ['tourist attraction', 'point of interest', 'attraction', 'sight', 'things to do', 'popular places'];
         const restaurantQueries = ['restaurant', 'food', 'dining', 'cafe'];
@@ -199,18 +229,9 @@ export default function HomeScreen() {
         const categoryResults = await Promise.all(categoryDefs.map(async (c) => {
           const raw = await fetchFirstMatch(c.queries);
           const normalized = (raw || []).map((it: any) => ({ ...it, fsq_id: it.fsq_id || it.fsq_place_id || it.id }));
-          const toFetch = normalized.slice(0, 8);
-          const detailed = await Promise.all(toFetch.map(async (p: any) => {
-            if (!p.fsq_id) return p;
-            try {
-              const d = await fetchPlaceDetails(p.fsq_id);
-              const res = d?.result || d;
-              return { ...p, rating: res?.rating ?? p.rating, price: res?.price ?? p.price, photos: res?.photos ?? p.photos, description: res?.description ?? p.description, distance: p.distance };
-            } catch (e) {
-              return p;
-            }
-          }));
-          return { key: c.key, title: c.title, items: detailed };
+          // Keep Home lightweight: use the compact results from fetchPlaces without additional detail fetches
+          const items = normalized.slice(0, 8);
+          return { key: c.key, title: c.title, items };
         }));
 
         const map: Record<string, Place[]> = {};
@@ -303,11 +324,22 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background[theme] }}>
-      <CustomHeader />
+      <CustomHeader showSettings={false} extraRight={
+        <TouchableOpacity onPress={() => router.push('/fuel' as any)} style={{ padding: 6 }}>
+          <FontAwesome name="tint" size={20} color={colors.textMuted[theme]} />
+        </TouchableOpacity>
+      } />
+  {/* Weather is rendered below the title as a compact single-line */}
       <ScrollView>
         <View style={styles.container}>
           <View style={styles.searchSection}>
             <Text style={[styles.welcomeTitle, { color: colors.text[theme] }]}>Where to, today?</Text>
+            {weather ? (
+              <Text style={[styles.weatherLine, { color: colors.textMuted[theme] }]}>
+                {weather.summary === 'Clear' ? '☀️' : weather.summary === 'Partly cloudy' ? '⛅' : weather.summary === 'Rain' || weather.summary?.includes('Rain') ? '🌧️' : weather.summary === 'Snow' ? '❄️' : '🌤️'}
+                {'  '}{Math.round(weather.temp ?? 0)}°C • {weather.summary} • Wind {Math.round(weather.wind ?? 0)} km/h
+              </Text>
+            ) : null}
             <View style={[styles.searchBar, { backgroundColor: colors.card[theme] }]}>
               <FontAwesome name="search" size={20} color={colors.textMuted[theme]} />
               <TextInput
@@ -373,6 +405,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, paddingBottom: 24 },
   searchSection: { paddingHorizontal: 16, paddingTop: 16 },
   welcomeTitle: { fontSize: 28, fontWeight: 'bold', marginBottom: 16 },
+  weatherBanner: { flexDirection: 'row', alignItems: 'center', padding: 12, marginHorizontal: 16, borderRadius: 12, marginBottom: 12 },
+  weatherLine: { fontSize: 14, marginBottom: 12 },
   searchBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingHorizontal: 16, height: 50 },
   searchInput: { marginLeft: 12, fontSize: 16, flex: 1 },
   banner: {

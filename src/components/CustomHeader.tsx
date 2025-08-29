@@ -7,7 +7,7 @@ import Constants from 'expo-constants';
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 
-export default function CustomHeader() {
+export default function CustomHeader({ showSettings = true, extraRight }: { showSettings?: boolean; extraRight?: React.ReactNode }) {
   const { theme, toggleTheme } = useTheme();
 
   return (
@@ -19,9 +19,12 @@ export default function CustomHeader() {
         <TouchableOpacity onPress={toggleTheme} style={styles.actionButton}>
           <FontAwesome name={theme === 'dark' ? 'sun-o' : 'moon-o'} size={22} color={colors.text[theme]} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push('/settings' as any)} style={styles.actionButton}>
-          <FontAwesome name="cog" size={22} color={colors.text[theme]} />
-        </TouchableOpacity>
+        {extraRight}
+        {showSettings ? (
+          <TouchableOpacity onPress={() => router.push('/settings' as any)} style={styles.actionButton}>
+            <FontAwesome name="cog" size={22} color={colors.text[theme]} />
+          </TouchableOpacity>
+        ) : null}
         <TouchableOpacity onPress={() => router.push('/profile' as any)} style={styles.actionButton}>
           <FontAwesome name="user-circle" size={22} color={colors.text[theme]} />
         </TouchableOpacity>

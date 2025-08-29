@@ -272,16 +272,21 @@ export default function ChatScreen() {
                 {msg.places.slice(0, 3).map((p, idx) => (
                   <View key={p.fsq_id || p.id || `${p.latitude || p.geocodes?.main?.lat}-${p.longitude || p.geocodes?.main?.lng}-${p.name || idx}`} style={[styles.placeCard, { minHeight: 120, padding: 16, borderRadius: 16 }]}>
                     <Text style={[styles.placeTitle, { color: colors.text[theme], fontSize: 18, fontWeight: 'bold' }]}>{p.name}</Text>
-                    <Text style={[styles.placeSubtitle, { color: colors.textMuted[theme], fontSize: 15 }]} numberOfLines={2}>{p.address}</Text>
+                    <Text style={[styles.placeSubtitle, { color: colors.textMuted[theme], fontSize: 15 }]} numberOfLines={2}>{p.location?.formatted_address || p.address || ''}</Text>
                     <Text style={[styles.placeMeta, { color: colors.textMuted[theme], fontSize: 14 }]}> 
-                      {p.category || 'Place'}{p.rating ? ` • ⭐ ${p.rating}` : ''}
+                      {p.category || (p.categories && p.categories.map((c:any)=>c.name).join(', ')) || 'Place'}{p.rating ? ` • ⭐ ${p.rating}` : ''}
                     </Text>
-                    <Text style={[styles.placeMeta, { color: colors.textMuted[theme], fontSize: 14 }]}> 
-                      {userLocation && (p.latitude || p.geocodes?.main?.lat) && (p.longitude || p.geocodes?.main?.lng)
-                        ? `Distance: ${haversine(userLocation.lat, userLocation.lng, p.latitude ?? p.geocodes?.main?.lat, p.longitude ?? p.geocodes?.main?.lng).toFixed(1)} km`
-                        : ''}
-                    </Text>
-                    <Text style={[styles.placeMeta, { color: colors.textMuted[theme], fontSize: 13, marginTop: 2 }]}>Details: {p.details || 'No details available.'}</Text>
+                    {typeof p.distance === 'number' ? (
+                      <Text style={[styles.placeMeta, { color: colors.textMuted[theme], fontSize: 14 }]}>Distance: {p.distance} m</Text>
+                    ) : userLocation && (p.latitude || p.geocodes?.main?.lat) && (p.longitude || p.geocodes?.main?.lng) ? (
+                      <Text style={[styles.placeMeta, { color: colors.textMuted[theme], fontSize: 14 }]}>Distance: {haversine(userLocation.lat, userLocation.lng, p.latitude ?? p.geocodes?.main?.lat, p.longitude ?? p.geocodes?.main?.lng).toFixed(1)} km</Text>
+                    ) : null}
+                    <Text style={[styles.placeMeta, { color: colors.textMuted[theme], fontSize: 13, marginTop: 2 }]}>Details: {p.details || (p as any).description || 'No details available.'}</Text>
+                    {/* extra fields */}
+                    {(p.tel) ? <Text style={[styles.placeMeta, { color: colors.textMuted[theme], fontSize: 13 }]}>Phone: {p.tel}</Text> : null}
+                    {p.website ? <Text style={[styles.placeMeta, { color: colors.primary[theme], fontSize: 13, textDecorationLine: 'underline' }]}>{p.website}</Text> : null}
+                    {p.fsq_place_id ? <Text style={[styles.placeMeta, { color: colors.textMuted[theme], fontSize: 12 }]}>ID: {p.fsq_place_id}</Text> : null}
+                    {p.link ? <Text style={[styles.placeMeta, { color: colors.primary[theme], fontSize: 13 }]} numberOfLines={1}>{p.link}</Text> : null}
                     <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
                       <TouchableOpacity
                         style={[styles.primaryButton, { backgroundColor: '#34a853', flex: 1, minHeight: 48 }]}
@@ -290,7 +295,6 @@ export default function ChatScreen() {
                             alert('User location not available');
                             return;
                           }
-                          // Robust: check all possible lat/lng fields
                           const lat = typeof p.latitude === 'number' ? p.latitude
                             : typeof p.lat === 'number' ? p.lat
                             : (typeof p.geocodes?.main?.lat === 'number' ? p.geocodes.main.lat : undefined);
@@ -303,8 +307,7 @@ export default function ChatScreen() {
                             const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
                             Linking.openURL(url).catch(() => alert('Could not open Google Maps.'));
                           } else {
-                            // Fallback: open our in-app Map View with fsq_id (to resolve exact coords) and query; draw route and show distance
-                              router.push({ pathname: '/map-view' as any, params: { name: p.name || 'Destination', fsq_id: p.fsq_id || '', q: p.name || p.location?.formatted_address || '', ulat: String(userLocation.lat), ulng: String(userLocation.lng) } });
+                            router.push({ pathname: '/map-view' as any, params: { name: p.name || 'Destination', fsq_id: p.fsq_id || '', q: p.name || p.location?.formatted_address || '', ulat: String(userLocation?.lat || ''), ulng: String(userLocation?.lng || '') } });
                           }
                         }}
                       >

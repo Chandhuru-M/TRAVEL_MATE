@@ -1,6 +1,6 @@
 // app/place/[id].tsx
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator, Image, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator, Image, ScrollView, TouchableOpacity, Linking } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { fetchPlaceDetails } from '@/lib/foursquare';
 import { useTheme } from '@/context/ThemeContext';
@@ -83,6 +83,32 @@ export default function PlaceDetailScreen() {
                 <Text style={[styles.statLabel, { color: colors.textMuted[theme] }]}>Distance</Text>
                 <Text style={[styles.statValue, { color: colors.text[theme] }]}>{typeof place.distance === 'number' ? `${place.distance} m` : '—'}</Text>
               </View>
+            </View>
+
+            {/* contact & extra fields */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text[theme] }]}>Contact</Text>
+              {(place.tel || place.phone) ? <Text style={[styles.sectionContent, { color: colors.textMuted[theme] }]}>{place.tel ?? place.phone}</Text> : <Text style={[styles.sectionContent, { color: colors.textMuted[theme] }]}>Phone: N/A</Text>}
+              {place.website ? (
+                <TouchableOpacity onPress={() => Linking.openURL(place.website)}>
+                  <Text style={[styles.sectionContent, { color: colors.primary[theme], textDecorationLine: 'underline' }]} numberOfLines={1}>{place.website}</Text>
+                </TouchableOpacity>
+              ) : null}
+              {place.fsq_place_id ? <Text style={[styles.idText, { color: colors.textMuted[theme] }]}>FSQ ID: {place.fsq_place_id}</Text> : null}
+              {place.link ? (
+                <TouchableOpacity onPress={() => {
+                  const l = place.link as string;
+                  const url = l.startsWith('http') ? l : `https://foursquare.com${l}`;
+                  Linking.canOpenURL(url).then(ok => ok && Linking.openURL(url)).catch(() => {});
+                }}>
+                  <Text style={[styles.sectionContent, { color: colors.primary[theme], textDecorationLine: 'underline' }]} numberOfLines={1}>{place.link}</Text>
+                </TouchableOpacity>
+              ) : null}
+              {((place.latitude ?? place.location?.latitude ?? place.lat) || (place.longitude ?? place.location?.longitude ?? place.lon)) ? (
+                <Text style={[styles.sectionContent, { color: colors.textMuted[theme] }]}>Coords: {place.latitude ?? place.location?.latitude ?? place.lat},{' '}{place.longitude ?? place.location?.longitude ?? place.lon}</Text>
+              ) : null}
+              {place.related_places ? <Text style={[styles.sectionContent, { color: colors.textMuted[theme] }]} numberOfLines={4}>Related: {typeof place.related_places === 'string' ? place.related_places : JSON.stringify(place.related_places)}</Text> : null}
+              {place.social_media ? <Text style={[styles.sectionContent, { color: colors.textMuted[theme] }]} numberOfLines={4}>Social: {typeof place.social_media === 'string' ? place.social_media : JSON.stringify(place.social_media)}</Text> : null}
             </View>
 
           </>

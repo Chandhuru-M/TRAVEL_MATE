@@ -1,6 +1,6 @@
 // src/components/PlaceCard.tsx
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ViewStyle, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ViewStyle, Alert, Linking } from 'react-native';
 import { Place } from '@/lib/types';
 import { FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,9 +13,11 @@ import { useTripStore } from '@/services/tripService';
 interface PlaceCardProps {
   place: Place;
   style?: ViewStyle;
+  compact?: boolean;
 }
 
-export default function PlaceCard({ place, style }: PlaceCardProps) {
+export default function PlaceCard({ place, style, compact = false }: PlaceCardProps) {
+  const [expanded, setExpanded] = useState(false);
   const { theme } = useTheme();
   const { activeTripPlanId, savePlaceToTrip } = useTripStore.getState();
 
@@ -103,6 +105,51 @@ export default function PlaceCard({ place, style }: PlaceCardProps) {
             <FontAwesome name="map-pin" size={14} color={colors.textMuted[theme]} />
             <Text style={[styles.address, { color: colors.textMuted[theme] }]} numberOfLines={1}>{place.location?.formatted_address}</Text>
           </View>
+
+          {/* extra metadata (hidden when compact to keep Home lightweight) */}
+          {!compact && (
+            <>
+              {(place as any).tel ? <Text style={[styles.metaSmall, { color: colors.textMuted[theme] }]}>{(place as any).tel}</Text> : null}
+              {(place as any).website ? <Text style={[styles.metaSmall, { color: colors.textMuted[theme] }]} numberOfLines={1}>{(place as any).website}</Text> : null}
+              {(place as any).fsq_place_id ? <Text style={[styles.metaSmall, { color: colors.textMuted[theme] }]}>ID: {(place as any).fsq_place_id}</Text> : null}
+              {typeof (place as any).distance === 'number' ? <Text style={[styles.metaSmall, { color: colors.textMuted[theme] }]}>{(place as any).distance} m away</Text> : null}
+              {(place.categories || []).length > 0 ? (
+                <Text style={[styles.metaSmall, { color: colors.textMuted[theme] }]} numberOfLines={1}>Categories: {(place.categories || []).map((c: any) => c.name).join(', ')}</Text>
+              ) : null}
+              {(((place as any).latitude ?? (place.location as any)?.latitude ?? (place as any).lat ?? (place.location as any)?.lat) || ((place as any).longitude ?? (place.location as any)?.longitude ?? (place as any).lon ?? (place.location as any)?.lon)) ? (
+                <Text style={[styles.metaSmall, { color: colors.textMuted[theme] }]}>Coords: {(place as any).latitude ?? (place.location as any)?.latitude ?? (place as any).lat ?? (place.location as any)?.lat},{' '}{(place as any).longitude ?? (place.location as any)?.longitude ?? (place as any).lon ?? (place.location as any)?.lon}</Text>
+              ) : null}
+              {(place as any).link ? (
+                <TouchableOpacity onPress={() => {
+                  const l = (place as any).link as string;
+                  const url = l.startsWith('http') ? l : `https://foursquare.com${l}`;
+                  Linking.canOpenURL(url).then(ok => ok && Linking.openURL(url)).catch(() => {});
+                }}>
+                  <Text style={[styles.linkText, { color: colors.primary[theme] }]} numberOfLines={1}>{(place as any).link}</Text>
+                </TouchableOpacity>
+              ) : null}
+              {(place as any).related_places ? (
+                <>
+                  <Text style={[styles.metaSmall, { color: colors.textMuted[theme] }]} numberOfLines={expanded ? undefined : 2}>Related: {typeof (place as any).related_places === 'string' ? (place as any).related_places : JSON.stringify((place as any).related_places)}</Text>
+                  {!expanded && String((place as any).related_places).length > 120 ? (
+                    <TouchableOpacity onPress={() => setExpanded(true)}>
+                      <Text style={[styles.moreBtn, { color: colors.primary[theme] }]}>Show more</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </>
+              ) : null}
+              {(place as any).social_media ? (
+                <>
+                  <Text style={[styles.metaSmall, { color: colors.textMuted[theme] }]} numberOfLines={expanded ? undefined : 2}>Social: {typeof (place as any).social_media === 'string' ? (place as any).social_media : JSON.stringify((place as any).social_media)}</Text>
+                  {!expanded && String((place as any).social_media).length > 120 ? (
+                    <TouchableOpacity onPress={() => setExpanded(true)}>
+                      <Text style={[styles.moreBtn, { color: colors.primary[theme] }]}>Show more</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </>
+              ) : null}
+            </>
+          )}
         </View>
       </TouchableOpacity>
       {/* --- SAVE BUTTON --- */}
@@ -132,6 +179,9 @@ const styles = StyleSheet.create({
       padding: 8,
       borderRadius: 20,
     },
+  metaSmall: { fontSize: 12, marginTop: 4 },
+  linkText: { fontSize: 13, marginTop: 6, textDecorationLine: 'underline' },
+  moreBtn: { marginTop: 6, fontSize: 13, fontWeight: '600' },
     pinButton: {
       position: 'absolute',
       top: 12,
