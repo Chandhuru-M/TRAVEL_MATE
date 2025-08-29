@@ -19,7 +19,21 @@ export default function PlaceCard({ place, style }: PlaceCardProps) {
   const { activeTripPlanId, savePlaceToTrip } = useTripStore.getState();
 
   const handlePress = () => {
-    router.push(`/place/${place.fsq_id}` as any);
+    const id = (place as any).fsq_id || (place as any).id || null;
+    if (!id) {
+      console.warn('[PlaceCard] missing place id, cannot navigate', place);
+      Alert.alert('Details unavailable', 'This place does not have an identifier to show details.');
+      return;
+    }
+
+    // Try to pass the place object to the details page so it can render immediately
+    try {
+      const serialized = encodeURIComponent(JSON.stringify(place));
+      router.push(`/place/${id}?place=${serialized}` as any);
+    } catch (e) {
+      // Fallback: navigate with id only
+      router.push(`/place/${id}` as any);
+    }
   };
 
   const handleSave = async () => {

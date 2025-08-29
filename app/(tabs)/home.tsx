@@ -91,7 +91,12 @@ export default function HomeScreen() {
         const raw = await AsyncStorage.getItem(HOTELS_KEY);
         if (raw) {
           const parsed: Place[] = JSON.parse(raw);
-          setHotels(parsed);
+          // Normalize cached items so they always have an identifier field
+          const normalized = parsed.map((it: any) => ({
+            ...it,
+            fsq_id: it.fsq_id || it.fsq_place_id || it.id,
+          }));
+          setHotels(normalized);
         }
       } catch (e) {
         console.warn('Failed to load cached hotels:', e);
@@ -100,7 +105,8 @@ export default function HomeScreen() {
 
     const cacheHotels = async (items: Place[]) => {
       try {
-        await AsyncStorage.setItem(HOTELS_KEY, JSON.stringify(items || []));
+  const normalized = (items || []).map((it: any) => ({ ...it, fsq_id: it.fsq_id || it.fsq_place_id || it.id }));
+  await AsyncStorage.setItem(HOTELS_KEY, JSON.stringify(normalized));
       } catch (e) {
         console.warn('Failed to cache hotels:', e);
       }
@@ -140,17 +146,18 @@ export default function HomeScreen() {
         // Fetch hotels (persistent): try fallback strategy
         const fetchedHotels = await tryFetchWithFallback(latitude, longitude, 'hotel');
         if (fetchedHotels.length > 0) {
-          setHotels(fetchedHotels);
-          cacheHotels(fetchedHotels);
+          const normalized = fetchedHotels.map((it: any) => ({ ...it, fsq_id: it.fsq_id || it.fsq_place_id || it.id }));
+          setHotels(normalized);
+          cacheHotels(normalized);
         }
 
         // Fetch popular places (use fallback)
-        const fetchedPopular = await tryFetchWithFallback(latitude, longitude, 'popular places');
-        setPlaces(fetchedPopular);
+  const fetchedPopular = await tryFetchWithFallback(latitude, longitude, 'popular places');
+  setPlaces((fetchedPopular || []).map((it: any) => ({ ...it, fsq_id: it.fsq_id || it.fsq_place_id || it.id })));
 
         // Fetch restaurants specifically
-        const fetchedRestaurants = await tryFetchWithFallback(latitude, longitude, 'restaurant');
-        setRestaurants(fetchedRestaurants);
+  const fetchedRestaurants = await tryFetchWithFallback(latitude, longitude, 'restaurant');
+  setRestaurants((fetchedRestaurants || []).map((it: any) => ({ ...it, fsq_id: it.fsq_id || it.fsq_place_id || it.id })));
 
       } catch (locErr: any) {
         console.error('places fetch error:', locErr);
