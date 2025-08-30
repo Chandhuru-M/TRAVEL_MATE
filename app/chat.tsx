@@ -1,12 +1,13 @@
 // app/chat.tsx
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, ActivityIndicator, Linking, Platform, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, ActivityIndicator, Linking, Platform, Keyboard, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import KeyboardAwareScrollView from '@/utils/keyboardAware'
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import { FontAwesome } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import { fetchPlaceDetails } from '@/lib/foursquare';
 import { sendChatMobile } from '@/services/mobileChatBot';
 import * as Speech from 'expo-speech';
 import { router } from 'expo-router';
@@ -41,6 +42,65 @@ export default function ChatScreen() {
   const [listening, setListening] = useState(false);
   const [inputBarHeight, setInputBarHeight] = useState(56);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // Normalize coordinates from various data shapes (fsq/place payloads)
+  const getPlaceCoords = (pl: any): { lat?: number; lng?: number } => {
+    const latCandidates = [
+      pl?.latitude,
+      pl?.lat,
+      pl?.location?.lat,
+      pl?.location?.latitude,
+      pl?.geocodes?.main?.lat,
+      pl?.geocodes?.main?.latitude,
+      pl?.coordinates?.lat,
+      pl?.coordinates?.latitude,
+    ];
+    const lngCandidates = [
+      pl?.longitude,
+      pl?.lng,
+      pl?.location?.lng,
+      pl?.location?.longitude,
+      pl?.geocodes?.main?.lng,
+      pl?.geocodes?.main?.longitude,
+      pl?.coordinates?.lng,
+      pl?.coordinates?.longitude,
+    ];
+    let lat: number | undefined;
+    for (const v of latCandidates) { if (typeof v === 'number' && !Number.isNaN(v)) { lat = v; break; } }
+    let lng: number | undefined;
+    for (const v of lngCandidates) { if (typeof v === 'number' && !Number.isNaN(v)) { lng = v; break; } }
+    return { lat, lng };
+  };
+
+  // Open Solo map with destination like Home's PlaceCard pin (resolves coords via FSQ details or falls back to address)
+  const openSoloMapForPlace = async (pl: any) => {
+    try {
+      let { lat, lng } = getPlaceCoords(pl);
+      let finalLat = lat;
+      let finalLng = lng;
+      if ((!finalLat || !finalLng) && (pl?.fsq_id || pl?.id)) {
+        try {
+          const details = await fetchPlaceDetails(pl.fsq_id || pl.id);
+          const res: any = details?.result || details || {};
+          finalLat = finalLat || res?.geocodes?.main?.latitude || res?.location?.latitude || res?.geocodes?.main?.lat || res?.location?.lat;
+          finalLng = finalLng || res?.geocodes?.main?.longitude || res?.location?.longitude || res?.geocodes?.main?.lng || res?.location?.lng;
+        } catch (e) {
+          // ignore, we'll fallback to address
+        }
+      }
+      if (finalLat && finalLng) {
+        const payload = encodeURIComponent(JSON.stringify({ latitude: finalLat, longitude: finalLng, name: pl?.name || 'Destination' }));
+        router.push({ pathname: '/map' as any, params: { solo: payload } });
+        return;
+      }
+      const addr = pl?.location?.formatted_address || pl?.location?.address || pl?.name;
+      if (!addr) { Alert.alert('Location unavailable', 'This place has no coordinates or address.'); return; }
+      const payload2 = encodeURIComponent(JSON.stringify({ address: addr, name: pl?.name || 'Destination' }));
+      router.push({ pathname: '/map' as any, params: { solo: payload2 } });
+    } catch (e) {
+      Alert.alert('Unable to open map');
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -165,7 +225,7 @@ export default function ChatScreen() {
             const origin = encodeURIComponent(`${originLat},${originLng}`);
             const dest = encodeURIComponent(`${lat},${lng}`);
             const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
-            Linking.openURL(url).catch(() => alert('Could not open Google Maps.'));
+            Linking.openURL(url).catch(() => Alert.alert('Could not open Google Maps.'));
           } else {
             const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
             Linking.openURL(url).catch(() => {});
@@ -339,37 +399,19 @@ export default function ChatScreen() {
                     {p.fsq_place_id ? <Text style={[styles.placeMeta, { color: colors.textMuted[theme], fontSize: 12 }]}>ID: {p.fsq_place_id}</Text> : null}
                     {p.link ? <Text style={[styles.placeMeta, { color: colors.primary[theme], fontSize: 13 }]} numberOfLines={1}>{p.link}</Text> : null}
                     <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
-                      <TouchableOpacity
+            <TouchableOpacity
                         style={[styles.primaryButton, { backgroundColor: '#34a853', flex: 1, minHeight: 48 }]}
                         onPress={() => {
-                          if (!userLocation) {
-                            alert('User location not available');
-                            return;
-                          }
-                          const lat = typeof p.latitude === 'number' ? p.latitude
-                            : typeof p.lat === 'number' ? p.lat
-                            : (typeof p.geocodes?.main?.lat === 'number' ? p.geocodes.main.lat : undefined);
-                          const lng = typeof p.longitude === 'number' ? p.longitude
-                            : typeof p.lng === 'number' ? p.lng
-                            : (typeof p.geocodes?.main?.lng === 'number' ? p.geocodes.main.lng : undefined);
-                          if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
-                            const origin = encodeURIComponent(`${userLocation.lat},${userLocation.lng}`);
-                            const dest = encodeURIComponent(`${lat},${lng}`);
-                            const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
-                            Linking.openURL(url).catch(() => alert('Could not open Google Maps.'));
-                          } else {
-                            router.push({ pathname: '/map-view' as any, params: { name: p.name || 'Destination', fsq_id: p.fsq_id || '', q: p.name || p.location?.formatted_address || '', ulat: String(userLocation?.lat || ''), ulng: String(userLocation?.lng || '') } });
-                          }
+              openSoloMapForPlace(p);
                         }}
                       >
                         <FontAwesome name="map" size={18} color="white" />
-                        <Text style={styles.primaryButtonText}>Google Directions</Text>
+                        <Text style={styles.primaryButtonText}>Get Directions</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity
+            <TouchableOpacity
                         style={[styles.primaryButton, { backgroundColor: '#10b981', flex: 1, minHeight: 48 }]}
                         onPress={() => {
-                          const lat = p.latitude ?? p.lat ?? p.geocodes?.main?.lat;
-                          const lng = p.longitude ?? p.lng ?? p.geocodes?.main?.lng;
+              const { lat, lng } = getPlaceCoords(p);
                           const ulat = userLocation?.lat
                           const ulng = userLocation?.lng
                           if (typeof lat === 'number' && typeof lng === 'number') {
@@ -393,10 +435,9 @@ export default function ChatScreen() {
                     style={[styles.primaryButton, { backgroundColor: '#2563eb', flex:1, minHeight: 48 }]}
                     onPress={() => {
                       const p = msg.places![0];
-                      const lat = p.latitude ?? p.geocodes?.main?.lat;
-                      const lng = p.longitude ?? p.geocodes?.main?.lng;
+                      const { lat, lng } = getPlaceCoords(p);
                       if (!lat || !lng) {
-                        alert('Place location not available');
+                        Alert.alert('Place location not available');
                         return;
                       }
                       router.push({ pathname: '/directions' as any, params: { lat, lng, name: p.name, ulat: userLocation?.lat ?? '', ulng: userLocation?.lng ?? '' } });
