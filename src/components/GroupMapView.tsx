@@ -505,8 +505,14 @@ document.addEventListener('message', (event) => {
       ) : (
         <View style={{ flex: 1 }}>
           <View style={[styles.header, { backgroundColor: colors.card[theme] }] }>
-            <Text style={[styles.headerText, { color: colors.text[theme], fontSize: 16 }]}>Group: {groupId}</Text>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Text
+              numberOfLines={1}
+              ellipsizeMode="middle"
+              style={[styles.headerText, styles.headerTitleFlex, { color: colors.text[theme], fontSize: 16 }]}
+            >
+              Group: {groupId}
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", marginRight: 8, flexShrink: 0 }}>
               <Text style={{ marginRight: 8, color: colors.text[theme] }}>{isSharing ? "Sharing" : "Hidden"}</Text>
               <Switch value={isSharing} onValueChange={setIsSharing} />
             </View>
@@ -515,7 +521,7 @@ document.addEventListener('message', (event) => {
             </TouchableOpacity>
           </View>
 
-          <View style={[styles.searchBox, { backgroundColor: colors.card[theme] }] }>
+          <View style={[styles.searchBox, { backgroundColor: colors.card[theme], marginTop: 4 }] }>
             <TextInput
               placeholder="Search (hospital, hotel, etc)"
               placeholderTextColor={colors.textMuted[theme]}
@@ -630,7 +636,8 @@ const styles = StyleSheet.create({
   joinContainer: { flex: 1, justifyContent: "center", alignItems: "center", padding: 24 },
   h1: { fontSize: 24, marginBottom: 20, fontWeight: "bold" },
   input: { borderWidth: 1, borderColor: "#ccc", width: "100%", marginBottom: 12, padding: 12, borderRadius: 8 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 12 },
+  header: { flexDirection: "row", alignItems: "center", padding: 12 },
+  headerTitleFlex: { flex: 1, minWidth: 0, marginRight: 8 },
   headerText: { fontSize: 16, fontWeight: "bold" },
   searchBox: { flexDirection: "row", padding: 12, alignItems: "center" },
   searchInput: { borderWidth: 1, borderColor: "#ccc", flex: 1, marginRight: 10, padding: 10, borderRadius: 8 },

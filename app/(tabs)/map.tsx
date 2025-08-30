@@ -48,7 +48,7 @@ export default function MapScreen() {
         {!keyboardVisible && (
           <TouchableOpacity
             onPress={() => toggleMode(mode === 'group' ? 'solo' : 'group')}
-            style={{ position: 'absolute', top: 90, right: 16, backgroundColor: colors.primary[theme], padding: 12, borderRadius: 28, elevation: 8 }}
+            style={{ position: 'absolute', top: 150, right: 16, backgroundColor: colors.primary[theme], padding: 12, borderRadius: 28, elevation: 8 }}
           >
             <FontAwesome name={mode === 'group' ? 'map' : 'users'} size={20} color="white" />
           </TouchableOpacity>

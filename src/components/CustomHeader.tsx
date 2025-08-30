@@ -1,7 +1,7 @@
 // src/components/CustomHeader.tsx
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { FontAwesome } from '@expo/vector-icons';
+import { FontAwesome, FontAwesome5 } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
 import { useTheme } from '@/context/ThemeContext';
@@ -20,11 +20,10 @@ export default function CustomHeader({ showSettings = true, extraRight }: { show
           <FontAwesome name={theme === 'dark' ? 'sun-o' : 'moon-o'} size={22} color={colors.text[theme]} />
         </TouchableOpacity>
         {extraRight}
-        {showSettings ? (
-          <TouchableOpacity onPress={() => router.push('/settings' as any)} style={styles.actionButton}>
-            <FontAwesome name="cog" size={22} color={colors.text[theme]} />
-          </TouchableOpacity>
-        ) : null}
+        {/* Replaced Settings with Fuel shortcut */}
+        <TouchableOpacity onPress={() => router.push('/fuel' as any)} style={styles.actionButton}>
+          <FontAwesome5 name="gas-pump" size={20} color={colors.text[theme]} />
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push('/profile' as any)} style={styles.actionButton}>
           <FontAwesome name="user-circle" size={22} color={colors.text[theme]} />
         </TouchableOpacity>

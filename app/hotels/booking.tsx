@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Platform, StatusBar, KeyboardAvoidingView } from 'react-native';
 import KeyboardAwareScrollView from '@/utils/keyboardAware'
-import useKeyboardVisible from '@/hooks/useKeyboardVisible'
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -38,12 +37,11 @@ export default function Booking() {
     const qs = `hotel=${encodeURIComponent(JSON.stringify(h))}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&phone=${encodeURIComponent(countryCode + phone)}&checkIn=${encodeURIComponent(checkIn + 'T' + checkInTime)}&checkOut=${encodeURIComponent(checkOut + 'T' + checkOutTime)}&guests=${encodeURIComponent(guests)}&rooms=${encodeURIComponent(rooms)}`;
     router.push((`/hotels/payment?${qs}`) as any);
   };
-  const keyboardVisible = useKeyboardVisible()
 
   return (
   <SafeAreaView style={{ flex: 1, backgroundColor: bg, paddingTop: (Platform.OS as string) === 'android' ? StatusBar.currentHeight : 0 }}>
       <KeyboardAvoidingView behavior={(Platform.OS as string) === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <KeyboardAwareScrollView style={{ flex: 1, backgroundColor: bg }} contentContainerStyle={{ padding: 16, flexGrow: 1 }} keyboardShouldPersistTaps="handled" enableOnAndroid enableAutomaticScroll>
+  <KeyboardAwareScrollView style={{ flex: 1, backgroundColor: bg }} contentContainerStyle={{ padding: 16, paddingBottom: 32 }} keyboardShouldPersistTaps="handled" enableOnAndroid enableAutomaticScroll>
         <Text style={{ fontSize: 20, fontWeight: '700', marginBottom: 8, color: textColor }}>Booking at {h.name}</Text>
 
       <Text style={{ marginTop: 8, color: textColor }}>Full Name</Text>
@@ -160,17 +158,14 @@ export default function Booking() {
 
       <Text style={{ marginTop: 8, color: textColor }}>Rooms</Text>
       <TextInput style={[styles.input, { backgroundColor: cardBg, color: textColor }]} value={rooms} onChangeText={setRooms} keyboardType="numeric" />
+        
+        {/* Submit at the end of the form (not floating) */}
+        <TouchableOpacity style={[styles.nextButton, { marginBottom: 8 }]} onPress={handleProceed}>
+          <Text style={{ color: '#fff', fontWeight: '700' }}>Proceed to Payment</Text>
+        </TouchableOpacity>
 
-        <View style={{ height: 20 }} />
+        <View style={{ height: (Platform.OS as string) === 'ios' ? 24 : 12 }} />
         </KeyboardAwareScrollView>
-
-        {!keyboardVisible && (
-          <View style={styles.bottomWrap} pointerEvents="box-none">
-            <TouchableOpacity style={[styles.nextButton, { marginBottom: (Platform.OS as string) === 'ios' ? 24 : 12 }]} onPress={handleProceed}>
-              <Text style={{ color: '#fff', fontWeight: '700' }}>Proceed to Payment</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -179,6 +174,4 @@ export default function Booking() {
 const styles = StyleSheet.create({
   input: { backgroundColor: '#fff', padding: 12, borderRadius: 8, marginTop: 6 },
   nextButton: { backgroundColor: '#007AFF', padding: 14, borderRadius: 10, marginTop: 20, alignItems: 'center', marginHorizontal: 16 },
-  // Move the button up by 1 inch (about 24px)
-  bottomWrap: { position: 'absolute', left: 0, right: 0, bottom: 24, alignItems: 'center', backgroundColor: 'transparent', paddingHorizontal: 16, paddingTop: 8 },
 });
