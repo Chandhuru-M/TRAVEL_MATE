@@ -1,6 +1,6 @@
 // app/chat.tsx
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Linking, Platform } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Linking, Platform, Keyboard } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import { FontAwesome } from '@expo/vector-icons';
@@ -11,22 +11,24 @@ import { router } from 'expo-router';
 import { analyzeTextWithGemini, GeminiChatResponse } from '@/services/geminiService';
 import { Place } from '@/lib/types';
 
-type ChatMsg = { id: string; role: 'assistant' | 'user'; content: string; places?: Place[] };
 
-function haversine(lat1:number, lon1:number, lat2:number, lon2:number) {
-  const toRad = (d:number)=> d*Math.PI/180
-  const R = 6371
-  const dLat = toRad(lat2-lat1)
-  const dLon = toRad(lon2-lon1)
-  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2
-  const c = 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
-  return R*c
+type ChatMsg = { id: string; role: 'assistant' | 'user'; content: string; places?: Place[] };
+const chatHistory: { messages: ChatMsg[]; input: string } = { messages: [], input: '' };
+
+function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const toRad = (d: number) => d * Math.PI / 180;
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
 
 export default function ChatScreen() {
   const { theme } = useTheme();
-  const [messages, setMessages] = useState<ChatMsg[]>([]);
-  const [input, setInput] = useState('');
+  const [messages, setMessages] = useState<ChatMsg[]>(chatHistory.messages);
+  const [input, setInput] = useState(chatHistory.input);
   const [loading, setLoading] = useState(false);
   const [sessionId] = useState(`m-${Math.random().toString(36).slice(2, 10)}`);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -47,8 +49,23 @@ export default function ChatScreen() {
   }, []);
 
   useEffect(() => {
-    endRef.current?.scrollToEnd({ animated: true });
-  }, [messages, loading]);
+    setTimeout(() => {
+      endRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+    // Persist chat history in module variable
+    chatHistory.messages = messages;
+    chatHistory.input = input;
+  }, [messages, loading, input]);
+
+  // Auto-scroll when keyboard appears
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', () => {
+      setTimeout(() => {
+        endRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    });
+    return () => showSub.remove();
+  }, []);
 
   const dynamicStyles = {
     container: { backgroundColor: colors.background[theme] },
@@ -93,6 +110,9 @@ export default function ChatScreen() {
     setMessages((m) => [...m, userMsg]);
     setInput('');
     setLoading(true);
+    setTimeout(() => {
+      endRef.current?.scrollToEnd({ animated: true });
+    }, 100);
   // Note: No auto-navigation for pre-booking. We'll render a button under the user's message instead.
 
     // --- NEW: Detect if user is selecting a place by name or number after recommendations ---
@@ -233,6 +253,17 @@ export default function ChatScreen() {
             style={styles.topButton}
           >
             <Text style={{ color: autoSpeak ? '#16a34a' : colors.textMuted[theme] }}>🔊 {autoSpeak ? 'ON' : 'OFF'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              setMessages([]);
+              setInput('');
+              chatHistory.messages = [];
+              chatHistory.input = '';
+            }}
+            style={[styles.topButton, { marginLeft: 8, backgroundColor: '#f1f5f9' }]}
+          >
+            <Text style={{ color: '#ef4444', fontWeight: 'bold' }}>New Chat</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -386,6 +417,7 @@ export default function ChatScreen() {
           onChangeText={setInput}
           onSubmitEditing={onSend}
           returnKeyType="send"
+          onFocus={() => setTimeout(() => endRef.current?.scrollToEnd({ animated: true }), 100)}
         />
         {Platform.OS === 'android' && (
           <TouchableOpacity

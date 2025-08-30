@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
@@ -30,23 +30,35 @@ export default function Payment() {
   };
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, backgroundColor: bg }}>
-      <Text style={{ fontSize: 20, fontWeight: '700', color: textColor }}>Payment</Text>
-      <View style={{ marginTop: 12 }}>
-        <Text style={{ color: textColor }}>Hotel: {h.name}</Text>
-        <Text style={{ color: textColor }}>Guest: {name}</Text>
-        <Text style={{ color: textColor }}>Nights: {nights}</Text>
-        <Text style={{ color: textColor }}>Total: ${total}</Text>
+    <View style={[styles.centeredContainer, { backgroundColor: bg }]}> 
+      <Text style={{ fontSize: 24, fontWeight: '700', color: textColor, marginBottom: 20 }}>Payment</Text>
+      <View style={{ marginBottom: 24, alignItems: 'center' }}>
+        <Text style={{ color: textColor, fontSize: 18, marginBottom: 4 }}>Hotel: {h.name}</Text>
+        <Text style={{ color: textColor, fontSize: 16, marginBottom: 4 }}>Guest: {name}</Text>
+        <Text style={{ color: textColor, fontSize: 16, marginBottom: 4 }}>Nights: {nights}</Text>
+        <Text style={{ color: textColor, fontSize: 16, marginBottom: 4 }}>Total: ${total}</Text>
       </View>
-
       <TouchableOpacity style={styles.payButton} onPress={handlePay}>
-        <Text style={{ color: '#fff', fontWeight: '700' }}>Pay Now</Text>
+        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 18 }}>Pay Now</Text>
       </TouchableOpacity>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  // Move the button up by 1 inch (about 24px)
-  payButton: { backgroundColor: '#007AFF', padding: 14, borderRadius: 10, marginTop: 20, alignItems: 'center', marginBottom: 48 }
+  centeredContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  payButton: {
+    backgroundColor: '#007AFF',
+    padding: 16,
+    borderRadius: 10,
+    marginTop: 20,
+    alignItems: 'center',
+    minWidth: 280,
+    marginBottom: 0,
+  },
 });

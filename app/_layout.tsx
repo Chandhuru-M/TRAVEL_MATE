@@ -4,6 +4,7 @@ import { Stack, SplashScreen, router } from 'expo-router';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { View, StyleSheet } from 'react-native';
 import FloatingChatButton from '../src/components/FloatingChatButton';
+import { usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ThemeProvider, useTheme } from '../src/context/ThemeContext';
 import { colors } from '../src/constants/Colors';
@@ -12,6 +13,7 @@ import { colors } from '../src/constants/Colors';
 const RootLayoutNav = () => {
   const { session, isLoading } = useAuth();
   const { theme } = useTheme();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!isLoading) {
@@ -43,7 +45,8 @@ const RootLayoutNav = () => {
         <Stack.Screen name="place/[id]" options={{ ...headerStyleOptions, title: "Place Details" }} />
         <Stack.Screen name="group" options={{ ...headerStyleOptions, title: "Group Travel" }} />
         <Stack.Screen name="fuel" options={{ ...headerStyleOptions, title: "Fuel Finder" }} />
-        <Stack.Screen name="profile" options={{ ...headerStyleOptions, title: "Profile" }} />
+    <Stack.Screen name="profile" options={{ ...headerStyleOptions, title: "Profile" }} />
+    <Stack.Screen name="FuelStations" options={{ ...headerStyleOptions, title: "Fuel Stations" }} />
         <Stack.Screen name="settings" options={{ ...headerStyleOptions, title: "Settings" }} />
         <Stack.Screen name="add-transaction" options={{ ...headerStyleOptions, title: "Add New Transaction", presentation: 'modal' }} />
         <Stack.Screen name="chat" options={{ ...headerStyleOptions, title: "AI Assistant", presentation: 'modal' }} />
@@ -53,7 +56,7 @@ const RootLayoutNav = () => {
         <Stack.Screen name="add-to-itinerary" options={{ ...headerStyleOptions, title: "Add to Itinerary", presentation: 'modal' }} />
       
       </Stack>
-      {session && <FloatingChatButton />}
+  {session && !pathname?.includes('/chat') && <FloatingChatButton />}
     </View>
   );
 };

@@ -114,7 +114,7 @@ export default function CreateTripScreen() {
             mode="date"
             display={Platform.OS === 'ios' ? 'spinner' : 'default'}
             onChange={onDateChange}
-            minimumDate={showPicker === 'end' ? startDate : undefined}
+            minimumDate={showPicker === 'start' ? new Date(new Date().setHours(0,0,0,0)) : new Date(Math.max(startDate.getTime(), new Date().setHours(0,0,0,0)) + 24*60*60*1000)}
           />
         )}
         

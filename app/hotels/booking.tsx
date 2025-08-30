@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Platform, StatusBar } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
@@ -17,17 +18,22 @@ export default function Booking() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [countryCode, setCountryCode] = useState('');
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showCheckOut, setShowCheckOut] = useState(false);
+  const [checkInTime, setCheckInTime] = useState('12:00');
+  const [checkOutTime, setCheckOutTime] = useState('12:00');
+  const [showCheckInTime, setShowCheckInTime] = useState(false);
+  const [showCheckOutTime, setShowCheckOutTime] = useState(false);
   const [guests, setGuests] = useState('1');
   const [rooms, setRooms] = useState('1');
 
   if (!h) return <View style={{flex:1,justifyContent:'center',alignItems:'center', backgroundColor: bg}}><Text style={{ color: textColor }}>No hotel selected</Text></View>;
 
   const handleProceed = () => {
-    const qs = `hotel=${encodeURIComponent(JSON.stringify(h))}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&phone=${encodeURIComponent(phone)}&checkIn=${encodeURIComponent(checkIn)}&checkOut=${encodeURIComponent(checkOut)}&guests=${encodeURIComponent(guests)}&rooms=${encodeURIComponent(rooms)}`;
+    const qs = `hotel=${encodeURIComponent(JSON.stringify(h))}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&phone=${encodeURIComponent(countryCode + phone)}&checkIn=${encodeURIComponent(checkIn + 'T' + checkInTime)}&checkOut=${encodeURIComponent(checkOut + 'T' + checkOutTime)}&guests=${encodeURIComponent(guests)}&rooms=${encodeURIComponent(rooms)}`;
     router.push((`/hotels/payment?${qs}`) as any);
   };
 
@@ -43,8 +49,33 @@ export default function Booking() {
       <TextInput style={[styles.input, { backgroundColor: cardBg, color: textColor }]} value={email} onChangeText={setEmail} keyboardType="email-address" />
 
       <Text style={{ marginTop: 8, color: textColor }}>Phone</Text>
-      <TextInput style={[styles.input, { backgroundColor: cardBg, color: textColor }]} value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
-
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ flex: 0.7, marginRight: 8, borderRadius: 8, overflow: 'hidden', backgroundColor: cardBg }}>
+          <Picker
+            selectedValue={countryCode}
+            onValueChange={setCountryCode}
+            style={{ color: textColor, height: 48 }}
+            dropdownIconColor={textColor}
+          >
+            <Picker.Item label="🇮🇳 +91" value="+91" />
+            <Picker.Item label="🇺🇸 +1" value="+1" />
+            <Picker.Item label="🇬🇧 +44" value="+44" />
+            <Picker.Item label="🇦🇺 +61" value="+61" />
+            <Picker.Item label="🇸🇬 +65" value="+65" />
+            <Picker.Item label="🇦🇪 +971" value="+971" />
+            <Picker.Item label="🇫🇷 +33" value="+33" />
+            <Picker.Item label="🇩🇪 +49" value="+49" />
+            <Picker.Item label="🇯🇵 +81" value="+81" />
+            <Picker.Item label="Other" value="+" />
+          </Picker>
+        </View>
+        <TextInput
+          style={[styles.input, { backgroundColor: cardBg, color: textColor, flex: 1 }]}
+          value={phone}
+          onChangeText={setPhone}
+          keyboardType="phone-pad"
+        />
+      </View>
 
       <Text style={{ marginTop: 8, color: textColor }}>Check-In</Text>
       <TouchableOpacity onPress={() => setShowCheckIn(true)} style={[styles.input, { backgroundColor: cardBg, justifyContent: 'center' }]}> 
@@ -55,6 +86,7 @@ export default function Booking() {
           value={checkIn ? new Date(checkIn) : new Date()}
           mode="date"
           display="default"
+          minimumDate={new Date()} // <-- Add this line
           onChange={(event, selectedDate) => {
             setShowCheckIn(false);
             if (selectedDate) {
@@ -77,6 +109,43 @@ export default function Booking() {
             setShowCheckOut(false);
             if (selectedDate) {
               setCheckOut(selectedDate.toISOString().split('T')[0]);
+            }
+          }}
+        />
+      )}
+
+      <Text style={{ marginTop: 8, color: textColor }}>Check-In Time</Text>
+      <TouchableOpacity onPress={() => setShowCheckInTime(true)} style={[styles.input, { backgroundColor: cardBg, justifyContent: 'center', marginTop: 6 }]}>
+        <Text style={{ color: textColor }}>{checkInTime || 'Select check-in time'}</Text>
+      </TouchableOpacity>
+      {showCheckInTime && (
+        <DateTimePicker
+          value={new Date(`1970-01-01T${checkInTime}`)}
+          mode="time"
+          display="default"
+          onChange={(event, selectedTime) => {
+            setShowCheckInTime(false);
+            if (selectedTime) {
+              const t = selectedTime.toTimeString().slice(0,5);
+              setCheckInTime(t);
+            }
+          }}
+        />
+      )}
+
+      <Text style={{ marginTop: 8, color: textColor }}>Check-Out Time</Text>
+      <TouchableOpacity onPress={() => setShowCheckOutTime(true)} style={[styles.input, { backgroundColor: cardBg, justifyContent: 'center' }]}> 
+        <Text style={{ color: checkOutTime ? textColor : '#888' }}>{checkOutTime || 'Select check-out time'}</Text>
+      </TouchableOpacity>
+      {showCheckOutTime && (
+        <DateTimePicker
+          value={new Date(`1970-01-01T${checkOutTime}:00`)}
+          mode="time"
+          display="default"
+          onChange={(event, selectedDate) => {
+            setShowCheckOutTime(false);
+            if (selectedDate) {
+              setCheckOutTime(selectedDate.toTimeString().split(' ')[0]);
             }
           }}
         />
