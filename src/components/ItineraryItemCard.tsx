@@ -6,6 +6,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import { FontAwesome } from '@expo/vector-icons';
 import { format, parse } from 'date-fns';
+import useKeyboardVisible from '@/hooks/useKeyboardVisible';
 
 interface ItineraryItemCardProps {
   item: ItineraryItem;
@@ -36,6 +37,7 @@ const getIconForEvent = (item: ItineraryItem): React.ComponentProps<typeof FontA
 
 export default function ItineraryItemCard({ item, onPress, onDelete }: ItineraryItemCardProps) {
   const { theme, timeFormat } = useTheme();
+  const keyboardVisible = useKeyboardVisible();
 
   const formatTime = (time: string) => {
     const date = parse(time, 'HH:mm', new Date());
@@ -50,7 +52,7 @@ export default function ItineraryItemCard({ item, onPress, onDelete }: Itinerary
   if (item.type === 'travel') {
     return (
       <View style={styles.travelContainer}>
-        <View style={styles.travelLine} />
+  {!keyboardVisible && <View style={styles.travelLine} />}
         <FontAwesome name="car" size={16} color={colors.textMuted[theme]} />
         <Text style={[styles.travelText, { color: colors.textMuted[theme] }]}>
           {item.travelDetails?.estimatedDuration} min travel to {item.travelDetails?.to}

@@ -1,8 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, KeyboardAvoidingView } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 // Import WebView only on web to avoid RNCWebView not found in Expo Go
-const WebView: any = Platform.OS === 'web' ? require('react-native-webview').WebView : null
+let WebView: any = null
+if ((Platform.OS as string) === 'web') {
+  // require at runtime only on web to prevent bundling native-only module on iOS/Android
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  WebView = require('react-native-webview').WebView
+}
 import * as Location from 'expo-location'
 import * as Speech from 'expo-speech'
 import { getBestRoute, geocodeMapbox, type LatLng, type RouteSummary } from '@/services/directions'
@@ -22,7 +27,7 @@ export default function LiveNavigation() {
   const token = (process as any)?.env?.EXPO_PUBLIC_MAPBOX_TOKEN
 
   useEffect(() => {
-      if (Platform.OS !== 'web') {
+    if ((Platform.OS as string) !== 'web') {
         let watchSub: Location.LocationSubscription | null = null
         let nextStep = 0
         const dist = (a: LatLng, b: LatLng) => {
@@ -124,9 +129,9 @@ export default function LiveNavigation() {
   }
 
   // On native, avoid embedded map and suggest opening Google Maps from directions instead
-  if (Platform.OS !== 'web') {
+  if ((Platform.OS as string) !== 'web') {
     return (
-      <View style={styles.container}>
+  <KeyboardAvoidingView style={styles.container} behavior={(Platform.OS as string) === 'ios' ? 'padding' : 'height'}>
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()}><Text style={styles.link}>Close</Text></TouchableOpacity>
           <Text style={styles.title} numberOfLines={1}>{destName}</Text>
@@ -135,7 +140,7 @@ export default function LiveNavigation() {
         <View style={{ padding: 16 }}>
           <Text>Live navigation preview is available on web. Use the Directions screen to open Google Maps for native navigation.</Text>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     )
   }
 
@@ -146,10 +151,12 @@ export default function LiveNavigation() {
         <Text style={styles.title} numberOfLines={1}>{destName}</Text>
         <View style={{ width: 48 }} />
       </View>
-      <View style={styles.searchBar}>
-        <TextInput placeholder='Search any place' value={search} onChangeText={setSearch} style={styles.input} />
-        <TouchableOpacity onPress={onSearch} style={styles.searchBtn}><Text style={{ color: 'white' }}>Search</Text></TouchableOpacity>
-      </View>
+      <KeyboardAvoidingView behavior={(Platform.OS as string) === 'ios' ? 'padding' : 'height'}>
+        <View style={styles.searchBar}>
+          <TextInput placeholder='Search any place' value={search} onChangeText={setSearch} style={styles.input} />
+          <TouchableOpacity onPress={onSearch} style={styles.searchBtn}><Text style={{ color: 'white' }}>Search</Text></TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
       <View style={{ flex: 1, backgroundColor: '#e5e7eb' }}>
         {WebView ? <WebView ref={webRef} originWhitelist={["*"]} source={{ html }} style={{ flex:1 }} /> : null}
       </View>
@@ -163,6 +170,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: '600' },
   link: { color: '#2563eb', fontWeight: '600' },
   searchBar: { flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingBottom: 8 },
-  input: { flex: 1, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10, paddingHorizontal: 12, paddingVertical: Platform.OS === 'ios' ? 10 : 6 },
+  input: { flex: 1, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10, paddingHorizontal: 12, paddingVertical: (Platform.OS as string) === 'ios' ? 10 : 6 },
   searchBtn: { backgroundColor: '#2563eb', borderRadius: 10, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
 })

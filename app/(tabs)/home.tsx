@@ -1,6 +1,6 @@
 // app/(tabs)/home.tsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { StyleSheet, View, Text, SafeAreaView, ScrollView, FlatList, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, SafeAreaView, ScrollView, FlatList, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import PlaceCard from '@/components/PlaceCard';
 import CustomHeader from '@/components/CustomHeader';
@@ -97,6 +97,7 @@ export default function HomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const HOTELS_KEY = 'hotels_cache_v1';
   const [searchText, setSearchText] = useState<string>('');
+  const [searchActive, setSearchActive] = useState<boolean>(false);
 
   // This useEffect hook now handles location permissions and fetches live data
   useEffect(() => {
@@ -256,6 +257,7 @@ export default function HomeScreen() {
     if (!query || query.trim().length === 0) {
       return;
     }
+    setSearchActive(true);
     setLoading(true);
     setError(null);
     try {
@@ -274,9 +276,15 @@ export default function HomeScreen() {
         }
       }
 
-      // Also fetch restaurants to populate the restaurants carousel
-      const fetchedRestaurants = await fetchPlacesNearby({ query: 'restaurant', radius: 10000, limit: 20 });
-      setRestaurants(fetchedRestaurants);
+      // Only fetch restaurants if the user's query implies restaurants/food
+      const qLower = query.toLowerCase();
+      if (qLower.includes('restaurant') || qLower.includes('food') || qLower.includes('dining') || qLower.includes('eat') || qLower.includes('cafe')) {
+        const fetchedRestaurants = await fetchPlacesNearby({ query: 'restaurant', radius: 10000, limit: 20 });
+        setRestaurants(fetchedRestaurants);
+      } else {
+        // clear restaurants for unrelated queries (e.g., atm)
+        setRestaurants([]);
+      }
     } catch (e: any) {
       console.error('performSearch error', e);
       setError(typeof e === 'string' ? e : e?.message || 'Search failed');
@@ -285,7 +293,33 @@ export default function HomeScreen() {
     }
   };
 
+  // Clear search mode when the input is cleared
+  useEffect(() => {
+    if (!searchText || searchText.trim().length === 0) {
+      setSearchActive(false);
+      setPlaces([]);
+      setRestaurants([]);
+    }
+  }, [searchText]);
+
   const renderContent = () => {
+    // When user performed a search, show search results first
+    if (searchActive) {
+      if (loading) return <ActivityIndicator size="large" color={colors.primary[theme]} style={{ marginTop: 24 }} />;
+      if (error) return <Text style={styles.errorText}>{error}</Text>;
+      if (places && places.length > 0) {
+        return (
+          <>
+            <CategoryCarousel title={`Search results for "${searchText}"`} places={places} />
+            {reversedRestaurants && reversedRestaurants.length > 0 && (
+              <CategoryCarousel title="Top-Rated Restaurants" places={reversedRestaurants} />
+            )}
+          </>
+        );
+      }
+      return <Text style={[styles.errorText, { color: colors.textMuted[theme] }]}>No results found for "{searchText}".</Text>;
+    }
+
     if (loading) {
       return <ActivityIndicator size="large" color={colors.primary[theme]} style={{ marginTop: 24 }} />;
     }
@@ -294,7 +328,7 @@ export default function HomeScreen() {
       return <Text style={styles.errorText}>{error}</Text>;
     }
 
-    // If we have category data, render the 7 category carousels in order
+    // If we have category data, render the category carousels in order
     if (Object.keys(categoryPlaces).length > 0) {
       return (
         <>
@@ -329,9 +363,11 @@ export default function HomeScreen() {
           <FontAwesome name="tint" size={20} color={colors.textMuted[theme]} />
         </TouchableOpacity>
       } />
-  {/* Weather is rendered below the title as a compact single-line */}
-      <ScrollView>
-        <View style={styles.container}>
+      {/* Keyboard aware wrapper so inputs remain visible when typing */}
+  <KeyboardAvoidingView style={{ flex: 1 }} behavior={(Platform.OS as string) === 'ios' ? 'padding' : 'height'}>
+        {/* Weather is rendered below the title as a compact single-line */}
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1 }}>
+          <View style={styles.container}>
           <View style={styles.searchSection}>
             <Text style={[styles.welcomeTitle, { color: colors.text[theme] }]}>Where to, today?</Text>
             {weather ? (
@@ -341,7 +377,13 @@ export default function HomeScreen() {
               </Text>
             ) : null}
             <View style={[styles.searchBar, { backgroundColor: colors.card[theme] }]}>
-              <FontAwesome name="search" size={20} color={colors.textMuted[theme]} />
+              {searchActive ? (
+                <TouchableOpacity onPress={() => { setSearchActive(false); setSearchText(''); setPlaces([]); setRestaurants([]); }}>
+                  <FontAwesome name="arrow-left" size={20} color={colors.textMuted[theme]} />
+                </TouchableOpacity>
+              ) : (
+                <FontAwesome name="search" size={20} color={colors.textMuted[theme]} />
+              )}
               <TextInput
                 placeholder="Search for a destination..."
                 placeholderTextColor={colors.textMuted[theme]}
@@ -365,6 +407,20 @@ export default function HomeScreen() {
               >
                 <Text style={{ color: '#fff', fontWeight: '600' }}>Search</Text>
               </TouchableOpacity>
+              {/* Cancel / Exit search button */}
+              {searchActive && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setSearchActive(false);
+                    setSearchText('');
+                    setPlaces([]);
+                    setRestaurants([]);
+                  }}
+                  style={{ marginLeft: 8, paddingHorizontal: 10, paddingVertical: 8 }}
+                >
+                  <Text style={{ color: colors.textMuted[theme], fontWeight: '600' }}>Cancel</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
@@ -395,8 +451,9 @@ export default function HomeScreen() {
               <FontAwesome name="arrow-right" size={20} color={colors.textMuted[theme]} />
             </View>
           </TouchableOpacity>
-        </View>
-      </ScrollView>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

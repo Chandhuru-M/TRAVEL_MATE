@@ -9,6 +9,7 @@ import { fetchPlaceDetails } from '@/lib/foursquare';
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import { useTripStore } from '@/services/tripService';
+import useKeyboardVisible from '@/hooks/useKeyboardVisible'
 
 interface PlaceCardProps {
   place: Place;
@@ -20,6 +21,7 @@ export default function PlaceCard({ place, style, compact = false }: PlaceCardPr
   const [expanded, setExpanded] = useState(false);
   const { theme } = useTheme();
   const { activeTripPlanId, savePlaceToTrip } = useTripStore.getState();
+  const keyboardVisible = useKeyboardVisible()
 
   const handlePress = () => {
     const id = (place as any).fsq_id || (place as any).id || null;
@@ -153,13 +155,17 @@ export default function PlaceCard({ place, style, compact = false }: PlaceCardPr
         </View>
       </TouchableOpacity>
       {/* --- SAVE BUTTON --- */}
-      <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-        <FontAwesome name="bookmark" size={20} color={'white'} />
-      </TouchableOpacity>
+      {!keyboardVisible && (
+        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+          <FontAwesome name="bookmark" size={20} color={'white'} />
+        </TouchableOpacity>
+      )}
       {/* --- PIN / DIRECTIONS BUTTON --- */}
-      <TouchableOpacity style={styles.pinButton} onPress={handlePin}>
-        <FontAwesome name="map-pin" size={18} color={'white'} />
-      </TouchableOpacity>
+      {!keyboardVisible && (
+        <TouchableOpacity style={styles.pinButton} onPress={handlePin}>
+          <FontAwesome name="map-pin" size={18} color={'white'} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -186,7 +192,8 @@ const styles = StyleSheet.create({
       position: 'absolute',
       top: 12,
       right: 52,
-      backgroundColor: 'rgba(0, 122, 255, 0.9)',
+  // match save button style: dark translucent background
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
       padding: 8,
       borderRadius: 20,
     },

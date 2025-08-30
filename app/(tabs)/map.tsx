@@ -8,10 +8,12 @@ import { colors } from '@/constants/Colors';
 import GroupMapView from '@/components/GroupMapView'; // Import the group map component
 import SoloMapView from '@/components/SoloMapView';
 import { useLocalSearchParams } from 'expo-router';
+import useKeyboardVisible from '@/hooks/useKeyboardVisible'
 
 export default function MapScreen() {
   const { theme } = useTheme();
   const params = useLocalSearchParams() as any;
+  const keyboardVisible = useKeyboardVisible()
   const initialSolo = params?.solo ? true : false;
   const [mode, setMode] = useState<'group' | 'solo'>(initialSolo ? 'solo' : 'group');
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -43,12 +45,14 @@ export default function MapScreen() {
         </Animated.View>
 
         {/* In-map floating toggle button */}
-        <TouchableOpacity
-          onPress={() => toggleMode(mode === 'group' ? 'solo' : 'group')}
-          style={{ position: 'absolute', top: 90, right: 16, backgroundColor: colors.primary[theme], padding: 12, borderRadius: 28, elevation: 8 }}
-        >
-          <FontAwesome name={mode === 'group' ? 'map' : 'users'} size={20} color="white" />
-        </TouchableOpacity>
+        {!keyboardVisible && (
+          <TouchableOpacity
+            onPress={() => toggleMode(mode === 'group' ? 'solo' : 'group')}
+            style={{ position: 'absolute', top: 90, right: 16, backgroundColor: colors.primary[theme], padding: 12, borderRadius: 28, elevation: 8 }}
+          >
+            <FontAwesome name={mode === 'group' ? 'map' : 'users'} size={20} color="white" />
+          </TouchableOpacity>
+        )}
       </View>
     </SafeAreaView>
   );
