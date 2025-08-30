@@ -8,7 +8,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import { FontAwesome } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { fetchPlaces, fetchPlacesNearby, getDeviceLocation } from '@/lib/foursquare'; // 1. Import the real API fetch functions
+import { fetchPlaces, fetchPlacesNearby, getDeviceLocation, fetchPlaceDetails } from '@/lib/foursquare';
 import { Place } from '@/lib/types';
 // location is handled in the foursquare helper now
 import { useTripStore } from '@/services/tripService';
@@ -230,8 +230,17 @@ export default function HomeScreen() {
         const categoryResults = await Promise.all(categoryDefs.map(async (c) => {
           const raw = await fetchFirstMatch(c.queries);
           const normalized = (raw || []).map((it: any) => ({ ...it, fsq_id: it.fsq_id || it.fsq_place_id || it.id }));
-          // Keep Home lightweight: use the compact results from fetchPlaces without additional detail fetches
-          const items = normalized.slice(0, 8);
+          // Fetch the first photo for each place (parallel, but limit concurrency)
+          const items = await Promise.all(normalized.slice(0, 8).map(async (place: any) => {
+            if (!place.fsq_id) return place;
+            try {
+              const details = await fetchPlaceDetails(place.fsq_id);
+              if (details && Array.isArray(details.photos) && details.photos.length > 0) {
+                return { ...place, photos: details.photos };
+              }
+            } catch {}
+            return place;
+          }));
           return { key: c.key, title: c.title, items };
         }));
 

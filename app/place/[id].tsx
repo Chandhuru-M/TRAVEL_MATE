@@ -1,10 +1,11 @@
 // app/place/[id].tsx
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator, Image, ScrollView, TouchableOpacity, Linking } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator, Image, ScrollView, TouchableOpacity, Linking, Alert } from 'react-native';
+import { useLocalSearchParams, router } from 'expo-router';
 import { fetchPlaceDetails } from '@/lib/foursquare';
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
+import { useTripStore } from '@/services/tripService';
 
 export default function PlaceDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -12,8 +13,8 @@ export default function PlaceDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [place, setPlace] = useState<any | null>(null);
-  // If the Home screen passed a serialized place via query params, use it.
   const params = useLocalSearchParams() as any;
+  const { activeTripPlanId, savePlaceToTrip } = useTripStore();
 
   useEffect(() => {
     let mounted = true;
@@ -52,6 +53,64 @@ export default function PlaceDetailScreen() {
     init();
     return () => { mounted = false };
   }, [id]);
+
+
+  // --- Button handlers (copied from PlaceCard) ---
+  const handlePin = async () => {
+    if (!place) return;
+    try {
+      const lat = place.latitude ?? place.location?.lat ?? place.location?.latitude ?? place.lat ?? null;
+      const lon = place.longitude ?? place.location?.lon ?? place.location?.longitude ?? place.lon ?? null;
+
+      let finalLat = lat;
+      let finalLon = lon;
+
+      // If no coords but we have a fsq_id, try fetching details from Foursquare
+      if ((!finalLat || !finalLon) && place.fsq_id) {
+        try {
+          const details = await fetchPlaceDetails(place.fsq_id);
+          const res = details?.result || details || {};
+          finalLat = finalLat || res?.geocodes?.main?.latitude || res?.location?.latitude || finalLat;
+          finalLon = finalLon || res?.geocodes?.main?.longitude || res?.location?.longitude || finalLon;
+        } catch (e) {
+          console.warn('fetchPlaceDetails failed', e);
+        }
+      }
+
+      if (finalLat && finalLon) {
+        const payload = encodeURIComponent(JSON.stringify({ latitude: finalLat, longitude: finalLon, name: place.name }));
+        router.push(`/map?solo=${payload}` as any);
+        return;
+      }
+
+      // Fallback: send address (SoloMapView will geocode it)
+      const addr = place.location?.formatted_address || place.location?.address || place.name;
+      if (!addr) { Alert.alert('Location unavailable', 'This place does not have coordinates or an address to navigate to.'); return; }
+      const payload2 = encodeURIComponent(JSON.stringify({ address: addr, name: place.name }));
+      router.push(`/map?solo=${payload2}` as any);
+    } catch (e) {
+      console.warn('pin navigation failed', e);
+      Alert.alert('Unable to open map');
+    }
+  };
+
+  const handleSave = async () => {
+    if (!activeTripPlanId) {
+      Alert.alert(
+        "No Active Trip",
+        "Please select an active trip from the Trip Planner tab before saving places.",
+        [{ text: "OK", onPress: () => router.push('/(tabs)/trip-planner' as any) }]
+      );
+      return;
+    }
+
+    const result = await savePlaceToTrip(activeTripPlanId, place);
+    if (result.success) {
+      Alert.alert("Place Saved!", `"${place.name}" has been added to your active trip.`);
+    } else {
+      Alert.alert("Error", result.error || "Could not save the place.");
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background[theme] }]}> 
@@ -116,9 +175,19 @@ export default function PlaceDetailScreen() {
           <Text style={[styles.errorText, { color: colors.textMuted[theme] }]}>No details available for this place.</Text>
         )}
       </ScrollView>
+      {/* --- BOTTOM ACTION BUTTONS --- */}
+      <View style={styles.bottomButtonRow}>
+        <TouchableOpacity style={styles.actionButton} onPress={handlePin}>
+          <Text style={styles.actionButtonText}>Get Directions</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionButton} onPress={handleSave}>
+          <Text style={styles.actionButtonText}>Save</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -139,4 +208,28 @@ const styles = StyleSheet.create({
   statBox: { minWidth: 96, flexBasis: '30%', padding: 8, borderRadius: 8, marginRight: 8, backgroundColor: 'transparent' },
   statLabel: { fontSize: 12 },
   statValue: { fontSize: 18, fontWeight: '700', marginTop: 4 },
+  bottomButtonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginHorizontal: 12,
+    marginBottom: 330, // move buttons up by about 15 inches
+    marginTop: 8,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2563eb',
+    paddingVertical: 14,
+    borderRadius: 10,
+    marginHorizontal: 4,
+  },
+  actionButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginLeft: 8,
+    textAlign: 'center',
+  },
 });
