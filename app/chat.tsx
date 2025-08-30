@@ -1,6 +1,7 @@
 // app/chat.tsx
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, ActivityIndicator, Linking, Platform, Keyboard, KeyboardAvoidingView } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, ActivityIndicator, Linking, Platform, Keyboard } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import KeyboardAwareScrollView from '@/utils/keyboardAware'
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
@@ -28,6 +29,7 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
 
 export default function ChatScreen() {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<ChatMsg[]>(chatHistory.messages);
   const [input, setInput] = useState(chatHistory.input);
   const [loading, setLoading] = useState(false);
@@ -37,6 +39,8 @@ export default function ChatScreen() {
   const [autoSpeak, setAutoSpeak] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [listening, setListening] = useState(false);
+  const [inputBarHeight, setInputBarHeight] = useState(56);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -60,12 +64,17 @@ export default function ChatScreen() {
 
   // Auto-scroll when keyboard appears
   useEffect(() => {
-    const showSub = Keyboard.addListener('keyboardDidShow', () => {
-      setTimeout(() => {
-        endRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+    const showEvt = ((Platform.OS as string) === 'ios') ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = ((Platform.OS as string) === 'ios') ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvt as any, (e: any) => {
+      const h = e?.endCoordinates?.height || 0;
+      setKeyboardHeight(h);
+      setTimeout(() => endRef.current?.scrollToEnd({ animated: true }), 50);
     });
-    return () => showSub.remove();
+    const hideSub = Keyboard.addListener(hideEvt as any, () => {
+      setKeyboardHeight(0);
+    });
+    return () => { showSub.remove(); hideSub.remove(); };
   }, []);
 
   const dynamicStyles = {
@@ -219,7 +228,7 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView style={[styles.container, dynamicStyles.container]}>
-  <KeyboardAvoidingView style={{ flex: 1 }} behavior={(Platform.OS as string) === 'ios' ? 'padding' : 'height'}>
+      <View style={{ flex: 1 }}>
         <View style={styles.header}>
         <View>
           <Text style={[styles.headerTitle, { color: colors.text[theme] }]}>TravelMate AI</Text>
@@ -269,7 +278,16 @@ export default function ChatScreen() {
           </TouchableOpacity>
         </View>
       </View>
-  <KeyboardAwareScrollView style={styles.messageContainer} innerRef={endRef} enableOnAndroid enableAutomaticScroll extraScrollHeight={12} keyboardShouldPersistTaps="handled">
+  <KeyboardAwareScrollView
+        style={styles.messageContainer}
+        contentContainerStyle={{ padding: 16, paddingBottom: 16 + inputBarHeight + (keyboardHeight > 0 ? keyboardHeight : Math.max(12, insets.bottom)) }}
+        innerRef={endRef}
+        enableOnAndroid
+        enableAutomaticScroll
+  extraScrollHeight={Math.max(24, inputBarHeight)}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={(Platform.OS as string) === 'ios' ? 'interactive' : 'on-drag'}
+      >
         {messages.map((msg, idx) => (
           <View
             key={msg.id}
@@ -410,7 +428,14 @@ export default function ChatScreen() {
         )}
       </KeyboardAwareScrollView>
 
-      <View style={[styles.inputContainer, dynamicStyles.inputContainer]}>
+      <View
+        style={[
+          styles.inputContainer,
+          dynamicStyles.inputContainer,
+          { paddingBottom: Math.max(12, insets.bottom), bottom: keyboardHeight },
+        ]}
+        onLayout={(e) => setInputBarHeight(Math.ceil(e.nativeEvent.layout.height))}
+      >
         <TextInput
           style={[styles.input, dynamicStyles.input]}
           placeholder="Ask me anything..."
@@ -435,7 +460,7 @@ export default function ChatScreen() {
           <FontAwesome name="send" size={20} style={dynamicStyles.icon} />
         </TouchableOpacity>
       </View>
-      </KeyboardAvoidingView>
+  </View>
     </SafeAreaView>
   );
 }
@@ -464,11 +489,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderTopWidth: 1,
-    // removed fixed bottom margin so KeyboardAvoidingView can handle spacing
+  position: 'absolute',
+  left: 0,
+  right: 0,
+  bottom: 0,
+  flexDirection: 'row',
+  alignItems: 'center',
+  padding: 12,
+  borderTopWidth: 1,
   },
   input: {
     flex: 1,
