@@ -7,7 +7,7 @@ import { colors } from '@/constants/Colors';
 import HotelCard from '../hotels/HotelCard';
 import { useRouter } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
-
+console.log("Entered Pre-booking screen");
 const hotels = [
   { id: '1', name: 'Grand Palace', location: 'Chennai', price: 120, rating: 4.5, image: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb', discount: '20%' },
   { id: '2', name: 'Beach Resort', location: 'Goa', price: 150, rating: 4.8, image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e', discount: '15%' },
@@ -35,6 +35,7 @@ export default function PreBookingScreen() {
           data={filtered}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingBottom: 40 }}
+          ListHeaderComponentStyle={{ marginBottom: 16 }}
           renderItem={({ item }) => (
             <HotelCard
               hotel={item}
@@ -72,7 +73,7 @@ export default function PreBookingScreen() {
 }
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  searchSection: { paddingHorizontal: 16, paddingTop: 16 },
+  searchSection: { paddingHorizontal: 16, paddingTop: 16,  },
   welcomeTitle: { fontSize: 22, fontWeight: '700', marginBottom: 12 },
   searchBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingHorizontal: 12, height: 48 },
   searchInput: { marginLeft: 10, fontSize: 16, flex: 1 },

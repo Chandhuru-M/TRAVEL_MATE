@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, SafeAreaView, Platform, StatusBar } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import * as MailComposer from 'expo-mail-composer';
 import { useTheme } from '@/context/ThemeContext';
@@ -36,36 +36,38 @@ export default function Receipt() {
   };
 
   return (
-    <ScrollView contentContainerStyle={[styles.container, { backgroundColor: bg }]}>
-      <Text style={[styles.title, { color: textColor }]}>Booking Confirmed</Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: bg, paddingTop: (Platform.OS as string) === 'android' ? StatusBar.currentHeight : 0 }}>
+      <ScrollView contentContainerStyle={[styles.container, { backgroundColor: bg }]}>
+        <Text style={[styles.title, { color: textColor }]}>Booking Confirmed</Text>
 
-      <View style={[styles.card, { backgroundColor: cardBg, borderColor: colors.border[theme] }]}>
-        <Text style={[styles.fieldLabel, { color: muted }]}>Hotel</Text>
-        <Text style={[styles.fieldValue, { color: textColor }]}>{h?.name}</Text>
+        <View style={[styles.card, { backgroundColor: cardBg, borderColor: colors.border[theme] }]}>
+          <Text style={[styles.fieldLabel, { color: muted }]}>Hotel</Text>
+          <Text style={[styles.fieldValue, { color: textColor }]}>{h?.name}</Text>
 
-        <Text style={[styles.fieldLabel, { color: muted }]}>Guest</Text>
-        <Text style={[styles.fieldValue, { color: textColor }]}>{name}</Text>
+          <Text style={[styles.fieldLabel, { color: muted }]}>Guest</Text>
+          <Text style={[styles.fieldValue, { color: textColor }]}>{name}</Text>
 
-        <Text style={[styles.fieldLabel, { color: muted }]}>Check-In</Text>
-        <Text style={[styles.fieldValue, { color: textColor }]}>{checkIn}</Text>
+          <Text style={[styles.fieldLabel, { color: muted }]}>Check-In</Text>
+          <Text style={[styles.fieldValue, { color: textColor }]}>{checkIn}</Text>
 
-        <Text style={[styles.fieldLabel, { color: muted }]}>Check-Out</Text>
-        <Text style={[styles.fieldValue, { color: textColor }]}>{checkOut}</Text>
+          <Text style={[styles.fieldLabel, { color: muted }]}>Check-Out</Text>
+          <Text style={[styles.fieldValue, { color: textColor }]}>{checkOut}</Text>
 
-        <Text style={[styles.fieldLabel, { color: muted }]}>Nights</Text>
-        <Text style={[styles.fieldValue, { color: textColor }]}>{nights}</Text>
+          <Text style={[styles.fieldLabel, { color: muted }]}>Nights</Text>
+          <Text style={[styles.fieldValue, { color: textColor }]}>{nights}</Text>
 
-        <Text style={[styles.fieldLabel, { color: muted }]}>Rooms</Text>
-        <Text style={[styles.fieldValue, { color: textColor }]}>{rooms}</Text>
+          <Text style={[styles.fieldLabel, { color: muted }]}>Rooms</Text>
+          <Text style={[styles.fieldValue, { color: textColor }]}>{rooms}</Text>
 
-        <Text style={[styles.fieldLabel, { color: muted }]}>Total</Text>
-        <Text style={[styles.fieldValue, { color: textColor }]}>${finalAmount}</Text>
-      </View>
+          <Text style={[styles.fieldLabel, { color: muted }]}>Total</Text>
+          <Text style={[styles.fieldValue, { color: textColor }]}>${finalAmount}</Text>
+        </View>
 
-      <TouchableOpacity style={[styles.emailButton, { backgroundColor: primary }]} onPress={sendEmail}>
-        <Text style={[styles.emailButtonText]}>Send Receipt to Email</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        <TouchableOpacity style={[styles.emailButton, { backgroundColor: primary }]} onPress={sendEmail}>
+          <Text style={[styles.emailButtonText]}>Send Receipt to Email</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Platform, StatusBar } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
@@ -30,18 +30,20 @@ export default function Payment() {
   };
 
   return (
-    <View style={[styles.centeredContainer, { backgroundColor: bg }]}> 
-      <Text style={{ fontSize: 24, fontWeight: '700', color: textColor, marginBottom: 20 }}>Payment</Text>
-      <View style={{ marginBottom: 24, alignItems: 'center' }}>
-        <Text style={{ color: textColor, fontSize: 18, marginBottom: 4 }}>Hotel: {h.name}</Text>
-        <Text style={{ color: textColor, fontSize: 16, marginBottom: 4 }}>Guest: {name}</Text>
-        <Text style={{ color: textColor, fontSize: 16, marginBottom: 4 }}>Nights: {nights}</Text>
-        <Text style={{ color: textColor, fontSize: 16, marginBottom: 4 }}>Total: ${total}</Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: bg, paddingTop: (Platform.OS as string) === 'android' ? StatusBar.currentHeight : 0 }}>
+      <View style={[styles.centeredContainer, { backgroundColor: bg }]}> 
+        <Text style={{ fontSize: 24, fontWeight: '700', color: textColor, marginBottom: 20 }}>Payment</Text>
+        <View style={{ marginBottom: 24, alignItems: 'center' }}>
+          <Text style={{ color: textColor, fontSize: 18, marginBottom: 4 }}>Hotel: {h.name}</Text>
+          <Text style={{ color: textColor, fontSize: 16, marginBottom: 4 }}>Guest: {name}</Text>
+          <Text style={{ color: textColor, fontSize: 16, marginBottom: 4 }}>Nights: {nights}</Text>
+          <Text style={{ color: textColor, fontSize: 16, marginBottom: 4 }}>Total: ${total}</Text>
+        </View>
+        <TouchableOpacity style={styles.payButton} onPress={handlePay}>
+          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 18 }}>Pay Now</Text>
+        </TouchableOpacity>
       </View>
-      <TouchableOpacity style={styles.payButton} onPress={handlePay}>
-        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 18 }}>Pay Now</Text>
-      </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 }
 

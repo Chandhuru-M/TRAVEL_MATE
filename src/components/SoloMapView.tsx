@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet, Alert, TextInput, TouchableOpacity, Text } from 'react-native';
 import { WebView } from 'react-native-webview';
 import axios from 'axios';
 import * as Location from 'expo-location';
+import { useTheme } from '@/context/ThemeContext';
+import { colors } from '@/constants/Colors';
 
 const MAPBOX_TOKEN = 'pk.eyJ1Ijoic291bmRoYXJ5YSIsImEiOiJjbWU4MG0zZHcwNXJ5MmpxeGRxYW1sdWU4In0.R1lZA658526l1ZF2VxGG-w';
 
@@ -44,6 +46,9 @@ interface Dest { latitude?: number; longitude?: number; address?: string; name?:
 export default function SoloMapView({ dest }: { dest?: Dest }) {
   const webRef = useRef<any>(null);
   const watchRef = useRef<any | null>(null);
+  const { theme } = useTheme();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentLoc, setCurrentLoc] = useState<{ latitude: number; longitude: number } | null>(null);
 
   const post = useCallback((m: any) => webRef.current?.postMessage(JSON.stringify(m)), []);
 
@@ -53,7 +58,8 @@ export default function SoloMapView({ dest }: { dest?: Dest }) {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') { if (mounted) Alert.alert('Location permission required'); return; }
       try {
-        const loc = await Location.getCurrentPositionAsync({});
+  const loc = await Location.getCurrentPositionAsync({});
+  setCurrentLoc({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
         post({ type: 'CENTER', center: [loc.coords.longitude, loc.coords.latitude], zoom: 14 });
         // If a destination was provided, fetch route and send to webview
         let finalDest: { latitude: number; longitude: number } | null = null;
@@ -85,6 +91,7 @@ export default function SoloMapView({ dest }: { dest?: Dest }) {
           } catch (e) { console.warn('solo route fetch failed', e); }
         }
         watchRef.current = await Location.watchPositionAsync({ accuracy: Location.Accuracy.Highest, distanceInterval: 5, timeInterval: 4000 }, (pos: any) => {
+          setCurrentLoc({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
           post({ type: 'USER_LOC', center: [pos.coords.longitude, pos.coords.latitude] });
           // If destination present, also update route live (optional): compute new route
           (async () => {
@@ -114,11 +121,61 @@ export default function SoloMapView({ dest }: { dest?: Dest }) {
     return () => { mounted = false; if (watchRef.current?.remove) watchRef.current.remove(); };
   }, [post, dest]);
 
+  const onSearch = useCallback(async () => {
+    const q = searchQuery.trim();
+    if (!q) return;
+    try {
+      let lat = currentLoc?.latitude;
+      let lon = currentLoc?.longitude;
+      if (!lat || !lon) {
+        const loc = await Location.getCurrentPositionAsync({});
+        lat = loc.coords.latitude; lon = loc.coords.longitude;
+        setCurrentLoc({ latitude: lat, longitude: lon });
+      }
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?access_token=${MAPBOX_TOKEN}&limit=10${lon && lat ? `&proximity=${lon},${lat}` : ''}`;
+      const res = await axios.get(url);
+      const features = (res.data as any)?.features || [];
+      const items = features.map((f: any) => ({
+        id: f.id || Math.random().toString(36).slice(2),
+        name: f.text || f.place_name || q,
+        address: f.place_name || '',
+        latitude: f.center?.[1],
+        longitude: f.center?.[0],
+      })).filter((p: any) => typeof p.latitude === 'number' && typeof p.longitude === 'number');
+      post({ type: 'PLACES', places: items });
+    } catch (e:any) {
+      console.warn('solo search failed', e?.message || e);
+    }
+  }, [searchQuery, currentLoc, post]);
+
   return (
     <View style={styles.container}>
+      {/* Search overlay */}
+      <View style={styles.searchOverlay}>
+        <View style={[styles.searchRow, { backgroundColor: colors.card[theme], borderColor: colors.border[theme] }]}>
+          <TextInput
+            placeholder="Search (hospital, hotel, etc)"
+            placeholderTextColor={colors.textMuted[theme]}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onSubmitEditing={onSearch}
+            style={[styles.searchInput, { color: colors.text[theme] }]}
+            returnKeyType="search"
+          />
+          <TouchableOpacity style={[styles.goBtn, { backgroundColor: colors.primary[theme] }]} onPress={onSearch}>
+            <Text style={{ color: '#fff', fontWeight: '700' }}>Go</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
       <WebView ref={webRef} originWhitelist={["*"]} source={{ html: MAP_HTML(MAPBOX_TOKEN) }} style={{ flex: 1 }} onMessage={() => {}} />
     </View>
   );
 }
 
-const styles = StyleSheet.create({ container: { flex: 1 } });
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  searchOverlay: { position: 'absolute', top: 8, left: 12, right: 12, zIndex: 10 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 8, borderWidth: 1 },
+  searchInput: { flex: 1, fontSize: 16, paddingHorizontal: 8, paddingVertical: 6 },
+  goBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginLeft: 8 },
+});
