@@ -1,28 +1,25 @@
 // app/fuel.tsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ActivityIndicator, FlatList, TextInput, Switch, Linking, Platform } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, TextInput, Switch, Platform } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
-import { fetchPlaces } from '@/lib/foursquare';
-import { Place } from '@/lib/types';
+import { useNavigation } from '@react-navigation/native';
 import { useHeaderHeight } from '@react-navigation/elements';
 
 const FUEL_THRESHOLD = 25; // Recommend refueling when below 25%
 
 export default function FuelScreen() {
-  const [loading, setLoading] = useState(false);
-  const [stations, setStations] = useState<Place[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [fuelLevel, setFuelLevel] = useState('80'); // Manual input
   const [isSimulated, setIsSimulated] = useState(false);
   const headerHeight = useHeaderHeight();
+  const navigation = useNavigation();
+  const [safeMessage, setSafeMessage] = useState<string | null>(null);
 
   const findNearbyGasStations = useCallback(async () => {
-    setLoading(true);
     setError(null);
-    setStations([]);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -31,22 +28,11 @@ export default function FuelScreen() {
       }
       const location = await Location.getCurrentPositionAsync({});
       const { latitude, longitude } = location.coords;
-
-      const results = await fetchPlaces({
-        lat: latitude,
-        lon: longitude,
-        query: 'gas station',
-        limit: 10,
-        radius: 10000, // 10km radius
-      });
-      
-      setStations(results);
+      navigation.navigate('FuelStations', { latitude, longitude });
     } catch (err: any) {
-      setError(err.message || 'Failed to find nearby gas stations.');
-    } finally {
-      setLoading(false);
+      setError(err.message || 'Failed to get location.');
     }
-  }, []);
+  }, [navigation]);
 
   useEffect(() => {
     if (isSimulated) {
@@ -64,35 +50,22 @@ export default function FuelScreen() {
   }, [isSimulated, findNearbyGasStations]);
 
   const handleManualCheck = () => {
+    setSafeMessage(null);
     const currentFuel = parseFloat(fuelLevel);
     if (!isNaN(currentFuel) && currentFuel < FUEL_THRESHOLD) {
       findNearbyGasStations();
     } else if (isNaN(currentFuel)) {
       setError("Please enter a valid fuel percentage.");
     } else {
-      setStations([]); // Clear stations if fuel is not low
+      setSafeMessage('Fuel level is safe.');
     }
   };
 
-  const handleNavigation = (place: Place) => {
-    if (place.geocodes?.main) {
-      const { lat, lng } = place.geocodes.main;
-      const scheme = Platform.OS === 'ios' ? 'maps:0,0?q=' : 'geo:0,0?q=';
-      const latLng = `${lat},${lng}`;
-      const label = place.name;
-      const url = `https://www.google.com/maps/dir/?api=1&destination=${latLng}`;
-      Linking.openURL(url);
-    } else {
-      setError("No location data available for this station to start navigation.");
-    }
-  };
-  
-  const numericFuelLevel = parseFloat(fuelLevel);
-  const isFuelLow = !isNaN(numericFuelLevel) && numericFuelLevel < FUEL_THRESHOLD;
+  // Removed handleNavigation and station list logic
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={[styles.content, { paddingTop: headerHeight }]}>
+      <View style={[styles.content, { paddingTop: headerHeight }]}> 
         <View style={styles.controlsContainer}>
           <View style={styles.toggleContainer}>
             <Text style={styles.label}>Manual</Text>
@@ -104,7 +77,6 @@ export default function FuelScreen() {
             />
             <Text style={styles.label}>Simulated</Text>
           </View>
-
           {!isSimulated && (
             <View style={styles.manualInputContainer}>
               <TextInput
@@ -121,37 +93,12 @@ export default function FuelScreen() {
             </View>
           )}
         </View>
-        
-        {isFuelLow && (
+        {safeMessage && (
           <View style={styles.recommendationHeader}>
-            <FontAwesome name="exclamation-triangle" size={20} color="#facc15" />
-            <Text style={styles.recommendationTitle}>Fuel Low! Consider refueling at:</Text>
+            <Text style={styles.recommendationTitle}>{safeMessage}</Text>
           </View>
         )}
-
-        {loading && <ActivityIndicator size="large" color="#3b82f6" style={{ marginVertical: 20 }} />}
         {error && <Text style={styles.errorText}>{error}</Text>}
-        
-        <FlatList
-          data={stations}
-          keyExtractor={(item) => item.fsq_id || uuidv4()}
-          renderItem={({ item }) => (
-            <TouchableOpacity onPress={() => handleNavigation(item)}>
-              <View style={styles.stationCard}>
-                <FontAwesome name="tint" size={24} color="#a5b4fc" />
-                <View style={styles.stationInfo}>
-                  <Text style={styles.stationName}>{item.name}</Text>
-                  <Text style={styles.stationAddress}>{item.location?.formatted_address || 'Address not available'}</Text>
-                  <Text style={styles.stationDistance}>{item.distance ? `${(item.distance / 1000).toFixed(1)} km away` : ''}</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          )}
-          ListEmptyComponent={() => (
-            !loading && isFuelLow && <Text style={styles.placeholderText}>No gas stations found nearby.</Text>
-          )}
-          contentContainerStyle={{ paddingBottom: 20 }}
-        />
       </View>
     </SafeAreaView>
   );
