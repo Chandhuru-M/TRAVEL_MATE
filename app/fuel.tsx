@@ -1,12 +1,12 @@
 // app/fuel.tsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, TextInput, Switch, Platform } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, TextInput, Switch, Platform, KeyboardAvoidingView } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
-import { useNavigation } from '@react-navigation/native';
 import { useHeaderHeight } from '@react-navigation/elements';
+import { useRouter } from 'expo-router'
 
 const FUEL_THRESHOLD = 25; // Recommend refueling when below 25%
 
@@ -15,7 +15,7 @@ export default function FuelScreen() {
   const [fuelLevel, setFuelLevel] = useState('80'); // Manual input
   const [isSimulated, setIsSimulated] = useState(false);
   const headerHeight = useHeaderHeight();
-  const navigation = useNavigation();
+  const router = useRouter()
   const [safeMessage, setSafeMessage] = useState<string | null>(null);
 
   const findNearbyGasStations = useCallback(async () => {
@@ -28,11 +28,17 @@ export default function FuelScreen() {
       }
       const location = await Location.getCurrentPositionAsync({});
       const { latitude, longitude } = location.coords;
-      navigation.navigate('FuelStations', { latitude, longitude });
+      // Use expo-router to navigate to the FuelStations screen with params
+      try {
+        router.push({ pathname: '/FuelStations', params: { latitude, longitude } } as any)
+      } catch {
+        // Fallback: push simple path
+        router.push(`/FuelStations?latitude=${latitude}&longitude=${longitude}` as any)
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to get location.');
     }
-  }, [navigation]);
+  }, [router]);
 
   useEffect(() => {
     if (isSimulated) {
@@ -65,7 +71,7 @@ export default function FuelScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={[styles.content, { paddingTop: headerHeight }]}> 
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={[styles.content, { paddingTop: headerHeight }]}> 
         <View style={styles.controlsContainer}>
           <View style={styles.toggleContainer}>
             <Text style={styles.label}>Manual</Text>
@@ -92,14 +98,14 @@ export default function FuelScreen() {
               </TouchableOpacity>
             </View>
           )}
-        </View>
-        {safeMessage && (
+  </View>
+  {safeMessage && (
           <View style={styles.recommendationHeader}>
             <Text style={styles.recommendationTitle}>{safeMessage}</Text>
           </View>
         )}
         {error && <Text style={styles.errorText}>{error}</Text>}
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

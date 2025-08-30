@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, StatusBar, Linking, TextInput } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, StatusBar, Linking, TextInput, KeyboardAvoidingView } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { WebView } from 'react-native-webview'
 import { getPlaceById, fetchPlaces } from '@/lib/foursquare'
 import * as Location from 'expo-location'
+import useKeyboardVisible from '@/hooks/useKeyboardVisible'
 
 // Prefer env token; fallback to the token used in GroupMapView
 const MAPBOX_TOKEN = (process as any)?.env?.EXPO_PUBLIC_MAPBOX_TOKEN || 'pk.eyJ1Ijoic291bmRoYXJ5YSIsImEiOiJjbWU4MG0zZHcwNXJ5MmpxeGRxYW1sdWU4In0.R1lZA658526l1ZF2VxGG-w'
@@ -28,6 +29,7 @@ export default function MapViewScreen() {
   const [loading, setLoading] = useState(true)
   const [distanceKm, setDistanceKm] = useState<number | null>(null)
   const [etaMin, setEtaMin] = useState<number | null>(null)
+  const keyboardVisible = useKeyboardVisible()
   
   // simple haversine to sort by nearest
   const haversine = (aLat:number, aLng:number, bLat:number, bLng:number) => {
@@ -402,7 +404,7 @@ export default function MapViewScreen() {
   }
 
   return (
-    <View style={styles.container}>
+  <KeyboardAvoidingView style={styles.container} behavior={(Platform.OS as string) === 'ios' ? 'padding' : 'height'}>
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => router.back()}><Text style={styles.link}>Close</Text></TouchableOpacity>
         <Text style={styles.title} numberOfLines={1}>{destName}</Text>
@@ -428,7 +430,7 @@ export default function MapViewScreen() {
           <View style={styles.loadingOverlay}><ActivityIndicator color="#111827" /></View>
         )}
         {/* Open in Google Maps (walking) button */}
-        {destLat != null && destLng != null && (
+  {destLat != null && destLng != null && !keyboardVisible && (
           <TouchableOpacity
             style={styles.gmapsFab}
             onPress={() => {
@@ -447,13 +449,13 @@ export default function MapViewScreen() {
             <Text style={{ color: 'white', fontWeight: '700' }}>Open in Google Maps</Text>
           </TouchableOpacity>
         )}
-        {distanceKm != null && (
+  {distanceKm != null && !keyboardVisible && (
           <View style={styles.infoBar}>
             <Text style={styles.infoText}>Distance: {distanceKm.toFixed(1)} km{etaMin != null ? ` • ETA: ${etaMin} min` : ''}</Text>
           </View>
         )}
       </View>
-    </View>
+    </KeyboardAvoidingView>
   )
 }
 

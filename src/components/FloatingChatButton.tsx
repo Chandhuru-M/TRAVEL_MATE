@@ -3,16 +3,20 @@ import React from 'react';
 import { TouchableOpacity, StyleSheet } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import useKeyboardVisible from '@/hooks/useKeyboardVisible'
 
 export default function FloatingChatButton() {
+  const keyboardVisible = useKeyboardVisible()
   const handlePress = () => {
     router.push('/chat' as any);
   };
 
   return (
-    <TouchableOpacity style={styles.button} onPress={handlePress}>
-      <FontAwesome name="comment" size={24} color="white" />
-    </TouchableOpacity>
+    !keyboardVisible ? (
+      <TouchableOpacity style={styles.button} onPress={handlePress}>
+        <FontAwesome name="comment" size={24} color="white" />
+      </TouchableOpacity>
+    ) : null
   );
 }
 

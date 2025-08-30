@@ -1,6 +1,7 @@
 // app/chat.tsx
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Linking, Platform, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, ActivityIndicator, Linking, Platform, Keyboard, KeyboardAvoidingView } from 'react-native';
+import KeyboardAwareScrollView from '@/utils/keyboardAware'
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import { FontAwesome } from '@expo/vector-icons';
@@ -32,7 +33,7 @@ export default function ChatScreen() {
   const [loading, setLoading] = useState(false);
   const [sessionId] = useState(`m-${Math.random().toString(36).slice(2, 10)}`);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const endRef = useRef<ScrollView>(null);
+  const endRef = useRef<any>(null);
   const [autoSpeak, setAutoSpeak] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [listening, setListening] = useState(false);
@@ -218,7 +219,8 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView style={[styles.container, dynamicStyles.container]}>
-      <View style={styles.header}>
+  <KeyboardAvoidingView style={{ flex: 1 }} behavior={(Platform.OS as string) === 'ios' ? 'padding' : 'height'}>
+        <View style={styles.header}>
         <View>
           <Text style={[styles.headerTitle, { color: colors.text[theme] }]}>TravelMate AI</Text>
           <Text style={[styles.headerSub, { color: colors.textMuted[theme] }]}>
@@ -267,7 +269,7 @@ export default function ChatScreen() {
           </TouchableOpacity>
         </View>
       </View>
-      <ScrollView style={styles.messageContainer} ref={endRef}>
+  <KeyboardAwareScrollView style={styles.messageContainer} innerRef={endRef} enableOnAndroid enableAutomaticScroll extraScrollHeight={12} keyboardShouldPersistTaps="handled">
         {messages.map((msg, idx) => (
           <View
             key={msg.id}
@@ -406,7 +408,7 @@ export default function ChatScreen() {
             </View>
           </View>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       <View style={[styles.inputContainer, dynamicStyles.inputContainer]}>
         <TextInput
@@ -419,7 +421,7 @@ export default function ChatScreen() {
           returnKeyType="send"
           onFocus={() => setTimeout(() => endRef.current?.scrollToEnd({ animated: true }), 100)}
         />
-        {Platform.OS === 'android' && (
+  {(Platform.OS as string) === 'android' && (
           <TouchableOpacity
             style={styles.iconButton}
             onPress={() => {
@@ -433,6 +435,7 @@ export default function ChatScreen() {
           <FontAwesome name="send" size={20} style={dynamicStyles.icon} />
         </TouchableOpacity>
       </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -465,7 +468,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     borderTopWidth: 1,
-    marginBottom: 48, // Move input bar half inch (48px) above the bottom
+    // removed fixed bottom margin so KeyboardAvoidingView can handle spacing
   },
   input: {
     flex: 1,

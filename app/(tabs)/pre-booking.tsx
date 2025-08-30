@@ -1,6 +1,6 @@
 // app/(tabs)/pre-booking.tsx
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import CustomHeader from '@/components/CustomHeader';
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
@@ -30,30 +30,11 @@ export default function PreBookingScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background[theme] }}>
       <CustomHeader />
-      <View style={styles.container}>
-        <View style={styles.searchSection}>
-          <Text style={[styles.welcomeTitle, { color: colors.text[theme] }]}>Hotel Pre-booking</Text>
-
-          <View style={[styles.searchBar, { backgroundColor: colors.card[theme] }]}>
-            <FontAwesome name="search" size={18} color={colors.textMuted[theme]} />
-            <TextInput
-              placeholder="Search hotels or location"
-              placeholderTextColor={colors.textMuted[theme]}
-              style={[styles.searchInput, { color: colors.text[theme] }]}
-              value={searchText}
-              onChangeText={setSearchText}
-              returnKeyType="search"
-            />
-            <TouchableOpacity onPress={() => {}} style={[styles.searchButton, { backgroundColor: colors.primary[theme] }]}>
-              <Text style={{ color: '#fff', fontWeight: '600' }}>Search</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
+      <KeyboardAvoidingView behavior={(Platform.OS as string) === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <FlatList
           data={filtered}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+          contentContainerStyle={{ paddingBottom: 40 }}
           renderItem={({ item }) => (
             <HotelCard
               hotel={item}
@@ -62,8 +43,30 @@ export default function PreBookingScreen() {
           )}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={<Text style={[styles.emptyText, { color: colors.textMuted[theme] }]}>No hotels found.</Text>}
+          ListHeaderComponent={(
+            <View style={styles.container}>
+              <View style={styles.searchSection}>
+                <Text style={[styles.welcomeTitle, { color: colors.text[theme] }]}>Hotel Pre-booking</Text>
+
+                <View style={[styles.searchBar, { backgroundColor: colors.card[theme] }]}>
+                  <FontAwesome name="search" size={18} color={colors.textMuted[theme]} />
+                  <TextInput
+                    placeholder="Search hotels or location"
+                    placeholderTextColor={colors.textMuted[theme]}
+                    style={[styles.searchInput, { color: colors.text[theme] }]}
+                    value={searchText}
+                    onChangeText={setSearchText}
+                    returnKeyType="search"
+                  />
+                  <TouchableOpacity onPress={() => {}} style={[styles.searchButton, { backgroundColor: colors.primary[theme] }]}>
+                    <Text style={{ color: '#fff', fontWeight: '600' }}>Search</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
         />
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

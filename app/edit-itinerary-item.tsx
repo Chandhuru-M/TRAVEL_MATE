@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, Alert, Platform, KeyboardAvoidingView } from 'react-native';
+import KeyboardAwareScrollView from '@/utils/keyboardAware'
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import { useTripStore } from '@/services/tripService';
@@ -85,7 +86,9 @@ export default function EditItineraryItemScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background[theme] }}>
-      <View style={styles.form}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <KeyboardAwareScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1 }} enableOnAndroid enableAutomaticScroll>
+          <View style={styles.form}>
         <Text style={[styles.label, { color: colors.text[theme] }]}>Event Title</Text>
         <TextInput 
           style={[styles.input, dynamicStyles.input]} 
@@ -135,7 +138,9 @@ export default function EditItineraryItemScreen() {
             {existingItem ? 'Update Event' : 'Add Event'}
           </Text>
         </TouchableOpacity>
-      </View>
+          </View>
+        </KeyboardAwareScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

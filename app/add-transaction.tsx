@@ -1,6 +1,6 @@
 // app/add-transaction.tsx
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import { useFinanceStore } from '@/services/financeService';
@@ -34,7 +34,9 @@ export default function AddTransactionScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background[theme] }}>
-      <View style={styles.form}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1 }}>
+          <View style={styles.form}>
         {/* Description Input */}
         <Text style={{ color: colors.text[theme] }}>Description</Text>
         <TextInput style={styles.input} value={description} onChangeText={setDescription} />
@@ -52,7 +54,9 @@ export default function AddTransactionScreen() {
         <TouchableOpacity style={styles.button} onPress={handleAdd}>
           <Text style={styles.buttonText}>Save Transaction</Text>
         </TouchableOpacity>
-      </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

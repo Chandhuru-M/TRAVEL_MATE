@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Platform, StatusBar } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Platform, StatusBar, KeyboardAvoidingView } from 'react-native';
+import KeyboardAwareScrollView from '@/utils/keyboardAware'
+import useKeyboardVisible from '@/hooks/useKeyboardVisible'
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -36,10 +38,12 @@ export default function Booking() {
     const qs = `hotel=${encodeURIComponent(JSON.stringify(h))}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&phone=${encodeURIComponent(countryCode + phone)}&checkIn=${encodeURIComponent(checkIn + 'T' + checkInTime)}&checkOut=${encodeURIComponent(checkOut + 'T' + checkOutTime)}&guests=${encodeURIComponent(guests)}&rooms=${encodeURIComponent(rooms)}`;
     router.push((`/hotels/payment?${qs}`) as any);
   };
+  const keyboardVisible = useKeyboardVisible()
 
   return (
-  <SafeAreaView style={{ flex: 1, backgroundColor: bg, paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 }}>
-      <ScrollView style={{ flex: 1, backgroundColor: bg }} contentContainerStyle={{ padding: 16, flexGrow: 1 }}>
+  <SafeAreaView style={{ flex: 1, backgroundColor: bg, paddingTop: (Platform.OS as string) === 'android' ? StatusBar.currentHeight : 0 }}>
+      <KeyboardAvoidingView behavior={(Platform.OS as string) === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <KeyboardAwareScrollView style={{ flex: 1, backgroundColor: bg }} contentContainerStyle={{ padding: 16, flexGrow: 1 }} keyboardShouldPersistTaps="handled" enableOnAndroid enableAutomaticScroll>
         <Text style={{ fontSize: 20, fontWeight: '700', marginBottom: 8, color: textColor }}>Booking at {h.name}</Text>
 
       <Text style={{ marginTop: 8, color: textColor }}>Full Name</Text>
@@ -158,13 +162,16 @@ export default function Booking() {
       <TextInput style={[styles.input, { backgroundColor: cardBg, color: textColor }]} value={rooms} onChangeText={setRooms} keyboardType="numeric" />
 
         <View style={{ height: 20 }} />
-      </ScrollView>
+        </KeyboardAwareScrollView>
 
-      <View style={styles.bottomWrap} pointerEvents="box-none">
-        <TouchableOpacity style={[styles.nextButton, { marginBottom: Platform.OS === 'ios' ? 24 : 12 }]} onPress={handleProceed}>
-          <Text style={{ color: '#fff', fontWeight: '700' }}>Proceed to Payment</Text>
-        </TouchableOpacity>
-      </View>
+        {!keyboardVisible && (
+          <View style={styles.bottomWrap} pointerEvents="box-none">
+            <TouchableOpacity style={[styles.nextButton, { marginBottom: (Platform.OS as string) === 'ios' ? 24 : 12 }]} onPress={handleProceed}>
+              <Text style={{ color: '#fff', fontWeight: '700' }}>Proceed to Payment</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
