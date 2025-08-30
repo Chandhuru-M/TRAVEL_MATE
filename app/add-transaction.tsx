@@ -5,12 +5,15 @@ import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import { useFinanceStore } from '@/services/financeService';
 import { router } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 // You would use a picker library for a real app, but we'll simulate it.
 import { Picker } from '@react-native-picker/picker';
 
 export default function AddTransactionScreen() {
   const { theme } = useTheme();
   const { accounts, addTransaction } = useFinanceStore();
+  const params = useLocalSearchParams() as { tripId?: string };
+  const prefilledTripId = params.tripId ?? null;
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<'expense' | 'income'>('expense');
@@ -26,8 +29,8 @@ export default function AddTransactionScreen() {
       amount: parseFloat(amount),
       type,
       account_id: selectedAccount,
-      trip_id: null, // Link to trip logic can be added here
-      category: 'General', // Category logic can be added here
+      trip_id: prefilledTripId ?? null,
+      category: 'General',
     });
     router.back();
   };

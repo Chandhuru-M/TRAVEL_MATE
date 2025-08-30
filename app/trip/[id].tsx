@@ -48,17 +48,65 @@ const ItineraryRoute = ({ trip }) => {
       <View style={styles.daySelectorContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {days.map(day => (
-            <TouchableOpacity
-              key={day}
-              style={[
-                styles.dayButton,
-                selectedDay === day && { backgroundColor: colors.primary[theme] }
-              ]}
-              onPress={() => setSelectedDay(day)}
-            >
-              <Text style={[styles.dayButtonText, selectedDay === day && { color: 'white' }]}>Day {day}</Text>
-            </TouchableOpacity>
+            <View key={day} style={{ marginRight: 8 }}>
+              <TouchableOpacity
+                style={[
+                  styles.dayButton,
+                  selectedDay === day && { backgroundColor: colors.primary[theme] }
+                ]}
+                onPress={() => setSelectedDay(day)}
+              >
+                <Text style={[styles.dayButtonText, selectedDay === day && { color: 'white' }]}>Day {day}</Text>
+              </TouchableOpacity>
+              {/* Small red minus on the top-right of the last day */}
+              {day === days[days.length - 1] && (
+                <TouchableOpacity
+                  onPress={async () => {
+                    Alert.alert('Remove last day', `Are you sure you want to remove Day ${day}? This will delete its events.`, [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Remove', style: 'destructive', onPress: async () => {
+                        try {
+                          const res = await useTripStore.getState().removeLastDay(trip.id);
+                          if (res.success) {
+                            const newSelected = Math.max(1, days.length - 1);
+                            setSelectedDay(newSelected);
+                          } else {
+                            Alert.alert('Could not remove day', res.error || 'Unknown error');
+                          }
+                        } catch (e) {
+                          Alert.alert('Error', 'Could not remove day.');
+                        }
+                      } }
+                    ]);
+                  }}
+                  style={styles.removeBadge}
+                >
+                  <Text style={styles.removeBadgeText}>-</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           ))}
+
+          {/* + Day button to extend the trip by one day */}
+          <TouchableOpacity
+            key="add-day"
+            style={[styles.addDayButton, { borderColor: colors.primary[theme], marginLeft: 8 }]}
+            onPress={async () => {
+              try {
+                const res = await useTripStore.getState().extendTripDays(trip.id, 1);
+                if (res.success) {
+                  const newTotal = days.length + 1;
+                  setSelectedDay(newTotal);
+                } else {
+                  Alert.alert('Could not add day', res.error || 'Unknown error');
+                }
+              } catch (e) {
+                Alert.alert('Error', 'Could not extend trip days.');
+              }
+            }}
+          >
+            <Text style={[styles.addDayButtonText, { color: colors.primary[theme] }]}>+ Day {days.length + 1}</Text>
+          </TouchableOpacity>
         </ScrollView>
       </View>
 
@@ -111,7 +159,7 @@ const SavedPlacesRoute = ({ trip }) => {
 // --- TAB 3: BUDGET ---
 const BudgetRoute = ({ trip }) => {
   const { theme } = useTheme();
-  const { transactions } = useFinanceStore();
+  const { transactions, fetchData } = useFinanceStore();
   const tripTransactions = useMemo(() => {
     return transactions.filter(t => t.trip_id === trip.id);
   }, [transactions, trip.id]);
@@ -122,7 +170,16 @@ const BudgetRoute = ({ trip }) => {
   const progress = totalBudget > 0 ? (spentAmount / totalBudget) * 100 : 0;
 
   return (
-    <ScrollView style={styles.sceneContainer}>
+    <ScrollView style={styles.sceneContainer} contentContainerStyle={{ paddingBottom: 40 }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <TouchableOpacity style={[styles.smallButton, { backgroundColor: colors.primary[theme] }]} onPress={() => router.push({ pathname: '/add-transaction', params: { tripId: trip.id } })}>
+          <Text style={{ color: 'white', fontWeight: '700' }}>+ Add Transaction</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.smallButton, { backgroundColor: colors.border[theme] }]} onPress={() => fetchData()}>
+          <Text style={{ color: colors.text[theme], fontWeight: '700' }}>Refresh Wallet</Text>
+        </TouchableOpacity>
+      </View>
+
       <View style={[styles.budgetSummaryCard, { backgroundColor: colors.card[theme] }]}>
         <Text style={[styles.budgetTitle, { color: colors.text[theme] }]}>Budget Overview</Text>
         <Text style={[styles.remainingText, { color: colors.text[theme] }]}>
@@ -141,9 +198,18 @@ const BudgetRoute = ({ trip }) => {
           {tripTransactions.map(item => <TransactionItem key={item.id} item={item} />)}
         </View>
       ) : (
-        <Text style={[styles.emptySceneText, { color: colors.textMuted[theme], marginTop: 20 }]}>
+        <Text style={[styles.emptySceneText, { color: colors.textMuted[theme], marginTop: 20 }]}> 
           No expenses have been linked to this trip yet.
         </Text>
+      )}
+
+      <Text style={[styles.listHeader, { color: colors.text[theme], marginTop: 20 }]}>Wallet Recent Transactions</Text>
+      {transactions.length > 0 ? (
+        <View style={{ paddingHorizontal: 16 }}>
+          {transactions.slice(0, 10).map(t => <TransactionItem key={t.id} item={t} />)}
+        </View>
+      ) : (
+        <Text style={[styles.emptySceneText, { color: colors.textMuted[theme], marginTop: 8 }]}>No transactions in your wallet yet.</Text>
       )}
     </ScrollView>
   );
@@ -333,5 +399,41 @@ const styles = StyleSheet.create({
   },
   timelineContainer: {
     padding: 16,
+  },
+  smallButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+  },
+  addDayButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginRight: 8,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+  borderStyle: 'dotted',
+  },
+  addDayButtonText: {
+    fontWeight: '600',
+  },
+  removeBadge: {
+    position: 'absolute',
+    right: -6,
+    top: -6,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#ef4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    elevation: 10,
+  },
+  removeBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    lineHeight: 12,
+    fontWeight: '700',
   },
 });

@@ -70,6 +70,8 @@ interface TripState {
   deleteTripPlan: (tripId: string) => Promise<void>;
   // Re-add the missing function definition
   moveSavedPlaceToItinerary: (tripId: string, day: number, place: Place, durationInMinutes: number) => Promise<{ success: boolean; error?: string }>;
+  extendTripDays: (tripId: string, additionalDays: number) => Promise<{ success: boolean; error?: string }>;
+  removeLastDay: (tripId: string) => Promise<{ success: boolean; error?: string }>;
 
 }
 // --- END OF FIX ---
@@ -280,6 +282,58 @@ export const useTripStore = create<TripState>((set, get) => ({
         p.id === tripId ? { ...p, itinerary: newFullItinerary, saved_places: updatedSavedPlaces } : p
       )
     }));
+    return { success: true };
+  },
+
+  // Append additionalDays worth of default events to the trip and extend the end date
+  extendTripDays: async (tripId, additionalDays) => {
+    const trip = get().tripPlans.find(p => p.id === tripId);
+    if (!trip) return { success: false, error: 'Trip not found' };
+    if (additionalDays <= 0) return { success: false, error: 'additionalDays must be > 0' };
+
+    const currentEnd = new Date(trip.dates.end);
+    const currentDays = differenceInDays(currentEnd, new Date(trip.dates.start)) + 1;
+    const newItems: ItineraryItem[] = [];
+    const createDefaultPlace = (name: string, fsq_id: string): Place => ({ fsq_id, name, categories: [{ name: 'Default' }] });
+
+    for (let i = 1; i <= additionalDays; i++) {
+      const dayIndex = currentDays + i;
+      newItems.push(
+        { id: uuid.v4() as string, day: dayIndex, startTime: '08:00', endTime: '09:00', type: 'default', isDefault: true, defaultType: 'breakfast', place: createDefaultPlace('Breakfast', `default_breakfast_${dayIndex}`) },
+        { id: uuid.v4() as string, day: dayIndex, startTime: '13:00', endTime: '14:00', type: 'default', isDefault: true, defaultType: 'lunch', place: createDefaultPlace('Lunch', `default_lunch_${dayIndex}`) },
+        { id: uuid.v4() as string, day: dayIndex, startTime: '20:00', endTime: '21:00', type: 'default', isDefault: true, defaultType: 'dinner', place: createDefaultPlace('Dinner', `default_dinner_${dayIndex}`) },
+        { id: uuid.v4() as string, day: dayIndex, startTime: '23:00', endTime: '23:59', type: 'default', isDefault: true, defaultType: 'sleep', place: createDefaultPlace('Sleep', `default_sleep_${dayIndex}`) }
+      );
+    }
+
+    const updatedItinerary = [...(trip.itinerary || []), ...newItems];
+    const newEndDate = addDays(new Date(trip.dates.end), additionalDays).toISOString();
+    const { error } = await supabase.from('trip_plans').update({ itinerary: updatedItinerary, dates: { ...trip.dates, end: newEndDate } }).eq('id', tripId);
+    if (error) {
+      console.error('Error extending trip days:', error);
+      return { success: false, error: error.message };
+    }
+    set(state => ({ tripPlans: state.tripPlans.map(p => p.id === tripId ? { ...p, itinerary: updatedItinerary, dates: { ...p.dates, end: newEndDate } } : p) }));
+    return { success: true };
+  },
+
+  // Remove the last day of the trip (and all itinerary items for that day)
+  removeLastDay: async (tripId) => {
+    const trip = get().tripPlans.find(p => p.id === tripId);
+    if (!trip) return { success: false, error: 'Trip not found' };
+    const start = new Date(trip.dates.start);
+    const end = new Date(trip.dates.end);
+    const totalDays = differenceInDays(end, start) + 1;
+    if (totalDays <= 1) return { success: false, error: 'Cannot remove the only day of a trip' };
+
+    const updatedItinerary = (trip.itinerary || []).filter(i => i.day !== totalDays);
+    const newEndDate = addDays(end, -1).toISOString();
+    const { error } = await supabase.from('trip_plans').update({ itinerary: updatedItinerary, dates: { ...trip.dates, end: newEndDate } }).eq('id', tripId);
+    if (error) {
+      console.error('Error removing last day:', error);
+      return { success: false, error: error.message };
+    }
+    set(state => ({ tripPlans: state.tripPlans.map(p => p.id === tripId ? { ...p, itinerary: updatedItinerary, dates: { ...p.dates, end: newEndDate } } : p) }));
     return { success: true };
   },
 }));
