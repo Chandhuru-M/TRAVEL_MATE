@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
+import KeyboardAwareScrollView from '@/utils/keyboardAware'
 import { router } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
 import { StatusBar } from 'expo-status-bar';
@@ -21,7 +22,7 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-        <View style={styles.innerContainer}>
+        <KeyboardAwareScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.innerContainer} enableOnAndroid enableAutomaticScroll>
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>Sign in to your account</Text>
           <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" placeholderTextColor="#94a3b8" />
@@ -35,7 +36,7 @@ export default function LoginScreen() {
               <Text style={styles.link}>Sign Up</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAwareScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

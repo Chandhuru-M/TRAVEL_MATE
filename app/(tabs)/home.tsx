@@ -367,11 +367,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background[theme] }}>
-      <CustomHeader showSettings={false} extraRight={
-        <TouchableOpacity onPress={() => router.push('/fuel' as any)} style={{ padding: 6 }}>
-          <FontAwesome name="tint" size={20} color={colors.textMuted[theme]} />
-        </TouchableOpacity>
-      } />
+  <CustomHeader showSettings={false} />
       {/* Keyboard aware wrapper so inputs remain visible when typing */}
   <KeyboardAvoidingView style={{ flex: 1 }} behavior={(Platform.OS as string) === 'ios' ? 'padding' : 'height'}>
         {/* Weather is rendered below the title as a compact single-line */}

@@ -42,16 +42,42 @@ export default function AddTransactionScreen() {
           <View style={styles.form}>
         {/* Description Input */}
         <Text style={{ color: colors.text[theme] }}>Description</Text>
-        <TextInput style={styles.input} value={description} onChangeText={setDescription} />
+        <TextInput
+          style={[
+            styles.input,
+            { backgroundColor: colors.card[theme], color: colors.text[theme], borderColor: colors.border[theme] },
+          ]}
+          value={description}
+          onChangeText={setDescription}
+          placeholderTextColor={colors.textMuted[theme]}
+          placeholder=""
+        />
 
         {/* Amount Input */}
         <Text style={{ color: colors.text[theme] }}>Amount</Text>
-        <TextInput style={styles.input} value={amount} onChangeText={setAmount} keyboardType="numeric" />
+        <TextInput
+          style={[
+            styles.input,
+            { backgroundColor: colors.card[theme], color: colors.text[theme], borderColor: colors.border[theme] },
+          ]}
+          value={amount}
+          onChangeText={setAmount}
+          keyboardType="numeric"
+          placeholderTextColor={colors.textMuted[theme]}
+          placeholder=""
+        />
 
         {/* Account Picker */}
         <Text style={{ color: colors.text[theme] }}>Account</Text>
-        <Picker selectedValue={selectedAccount} onValueChange={(itemValue) => setSelectedAccount(itemValue)}>
-          {accounts.map(acc => <Picker.Item key={acc.id} label={acc.name} value={acc.id} />)}
+        <Picker
+          selectedValue={selectedAccount}
+          onValueChange={(itemValue) => setSelectedAccount(itemValue)}
+          style={{ color: colors.textMuted[theme] }}
+          dropdownIconColor={colors.textMuted[theme]}
+        >
+          {accounts.map(acc => (
+            <Picker.Item key={acc.id} label={acc.name} value={acc.id} color={colors.textMuted[theme]} />
+          ))}
         </Picker>
 
         <TouchableOpacity style={styles.button} onPress={handleAdd}>
@@ -66,7 +92,7 @@ export default function AddTransactionScreen() {
 
 const styles = StyleSheet.create({
   form: { padding: 20 },
-  input: { padding: 14, borderRadius: 8, fontSize: 16, marginBottom: 20, borderWidth: 1, backgroundColor: 'white' },
+  input: { padding: 14, borderRadius: 8, fontSize: 16, marginBottom: 20, borderWidth: 1 },
   button: { backgroundColor: '#2563eb', padding: 16, borderRadius: 8, alignItems: 'center' },
   buttonText: { color: 'white', fontWeight: 'bold' },
 });

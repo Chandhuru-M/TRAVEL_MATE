@@ -1,6 +1,7 @@
 // app/create-account.tsx
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import KeyboardAwareScrollView from '@/utils/keyboardAware'
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import { useFinanceStore } from '@/services/financeService';
@@ -31,32 +32,41 @@ export default function CreateAccountScreen() {
   const dynamicStyles = {
     input: { backgroundColor: colors.card[theme], color: colors.text[theme], borderColor: colors.border[theme] },
     label: { color: colors.textMuted[theme] },
-    picker: { color: colors.text[theme] },
+    picker: { color: colors.textMuted[theme] },
   };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background[theme] }}>
-      <View style={styles.form}>
-        <Text style={[styles.label, dynamicStyles.label]}>Account Name</Text>
-        <TextInput style={[styles.input, dynamicStyles.input]} placeholder="e.g., HDFC Bank Savings" value={name} onChangeText={setName} />
+      <KeyboardAvoidingView behavior={(Platform.OS as string) === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <KeyboardAwareScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1 }} enableOnAndroid enableAutomaticScroll>
+          <View style={styles.form}>
+            <Text style={[styles.label, dynamicStyles.label]}>Account Name</Text>
+            <TextInput style={[styles.input, dynamicStyles.input]} placeholder="e.g., HDFC Bank Savings" placeholderTextColor={colors.textMuted[theme]} value={name} onChangeText={setName} />
 
-        <Text style={[styles.label, dynamicStyles.label]}>Initial Balance (INR)</Text>
-        <TextInput style={[styles.input, dynamicStyles.input]} placeholder="e.g., 50000" value={balance} onChangeText={setBalance} keyboardType="numeric" />
+            <Text style={[styles.label, dynamicStyles.label]}>Initial Balance (INR)</Text>
+            <TextInput style={[styles.input, dynamicStyles.input]} placeholder="e.g., 50000" placeholderTextColor={colors.textMuted[theme]} value={balance} onChangeText={setBalance} keyboardType="numeric" />
 
-        <Text style={[styles.label, dynamicStyles.label]}>Account Type</Text>
-        <View style={[styles.input, dynamicStyles.input]}>
-          <Picker selectedValue={type} onValueChange={(itemValue) => setType(itemValue)} itemStyle={dynamicStyles.picker}>
-            <Picker.Item label="Bank Account" value="bank_account" />
-            <Picker.Item label="Credit Card" value="credit_card" />
-            <Picker.Item label="Cash" value="cash" />
-            <Picker.Item label="E-Wallet" value="e-wallet" />
-          </Picker>
-        </View>
+            <Text style={[styles.label, dynamicStyles.label]}>Account Type</Text>
+            <View style={[styles.input, dynamicStyles.input]}>
+              <Picker
+                selectedValue={type}
+                onValueChange={(itemValue) => setType(itemValue)}
+                style={dynamicStyles.picker}
+                dropdownIconColor={colors.textMuted[theme]}
+              >
+                <Picker.Item label="Bank Account" value="bank_account" color={colors.textMuted[theme]} />
+                <Picker.Item label="Credit Card" value="credit_card" color={colors.textMuted[theme]} />
+                <Picker.Item label="Cash" value="cash" color={colors.textMuted[theme]} />
+                <Picker.Item label="E-Wallet" value="e-wallet" color={colors.textMuted[theme]} />
+              </Picker>
+            </View>
 
-        <TouchableOpacity style={styles.button} onPress={handleCreate}>
-          <Text style={styles.buttonText}>Create Account</Text>
-        </TouchableOpacity>
-      </View>
+            <TouchableOpacity style={styles.button} onPress={handleCreate}>
+              <Text style={styles.buttonText}>Create Account</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAwareScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

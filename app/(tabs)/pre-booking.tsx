@@ -35,6 +35,8 @@ export default function PreBookingScreen() {
           data={filtered}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingBottom: 40 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'on-drag' : 'on-drag'}
           ListHeaderComponentStyle={{ marginBottom: 16 }}
           renderItem={({ item }) => (
             <HotelCard
