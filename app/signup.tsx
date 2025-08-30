@@ -1,6 +1,7 @@
 // app/signup.tsx
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
+import KeyboardAwareScrollView from '@/utils/keyboardAware'
 import { router } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
 import { StatusBar } from 'expo-status-bar'; // Import StatusBar
@@ -29,7 +30,7 @@ export default function SignUpScreen() {
       {/* FIX: Ensure status bar text is light on this screen */}
       <StatusBar style="light" />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardView}>
-        <View style={styles.innerContainer}>
+        <KeyboardAwareScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.innerContainer} enableOnAndroid enableAutomaticScroll>
           <Text style={styles.title}>Create Account</Text>
           <Text style={styles.subtitle}>Start your journey with us</Text>
 
@@ -61,7 +62,7 @@ export default function SignUpScreen() {
               <Text style={styles.link}>Sign In</Text>
             </TouchableOpacity>
           </View>
-        </View>
+  </KeyboardAwareScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
