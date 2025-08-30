@@ -1,6 +1,6 @@
 // src/components/PlaceCard.tsx
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ViewStyle, Alert, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ViewStyle, Alert, Linking, Image } from 'react-native';
 import { Place } from '@/lib/types';
 import { FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -97,10 +97,23 @@ export default function PlaceCard({ place, style, compact = false }: PlaceCardPr
     }
   };
 
+  // Try to get the first photo URL if available
+  let photoUrl: string | null = null;
+  if (Array.isArray((place as any).photos) && (place as any).photos.length > 0) {
+    const p = (place as any).photos[0];
+    if (p.prefix && p.suffix) {
+      photoUrl = `${p.prefix}original${p.suffix}`;
+    }
+  }
+
   return (
     <View style={[styles.card, { backgroundColor: colors.card[theme] }, style]}>
       <TouchableOpacity onPress={handlePress}>
-        <LinearGradient colors={['#E0E7FF', '#C7D2FE']} style={styles.imagePlaceholder} />
+        {photoUrl ? (
+          <Image source={{ uri: photoUrl }} style={styles.imagePlaceholder} resizeMode="cover" />
+        ) : (
+          <LinearGradient colors={['#E0E7FF', '#C7D2FE']} style={styles.imagePlaceholder} />
+        )}
         <View style={styles.content}>
           <Text style={[styles.title, { color: colors.text[theme] }]} numberOfLines={1}>{place.name}</Text>
           <View style={styles.locationContainer}>
