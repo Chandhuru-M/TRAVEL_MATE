@@ -2,9 +2,9 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, FlatList, TouchableOpacity, Linking } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
-import { fetchPlaces } from '@/lib/foursquare';
+import { fetchPlaces, getDeviceLocation } from '@/lib/foursquare';
 import { Place } from '@/lib/types';
-import { RouteProp, useRoute } from '@react-navigation/native';
+import { useLocalSearchParams } from 'expo-router';
 
 type FuelStationsRouteParams = {
   latitude: number;
@@ -12,32 +12,31 @@ type FuelStationsRouteParams = {
 };
 
 export default function FuelStations() {
-  const route = useRoute();
-  // @ts-ignore
-  const params = (route as any)?.params as FuelStationsRouteParams | undefined;
-  const latitude = params?.latitude;
-  const longitude = params?.longitude;
+  const params = useLocalSearchParams() as any;
+  const latitude = params?.latitude != null ? Number(params.latitude) : undefined;
+  const longitude = params?.longitude != null ? Number(params.longitude) : undefined;
   const [loading, setLoading] = useState(true);
   const [stations, setStations] = useState<Place[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (typeof latitude !== 'number' || typeof longitude !== 'number') {
-      setError('No location data provided.');
-      setLoading(false);
-      return;
-    }
     const getStations = async () => {
       setLoading(true);
       setError(null);
       try {
-        const results = await fetchPlaces({
-          lat: latitude,
-          lon: longitude,
-          query: 'gas station',
-          limit: 10,
-          radius: 10000,
-        });
+        let lat = latitude;
+        let lon = longitude;
+        if (!(typeof lat === 'number' && !Number.isNaN(lat) && typeof lon === 'number' && !Number.isNaN(lon))) {
+          // fallback to device location if params missing/invalid
+          try {
+            const loc = await getDeviceLocation();
+            lat = loc.latitude;
+            lon = loc.longitude;
+          } catch (e: any) {
+            throw new Error('No location data provided.');
+          }
+        }
+        const results = await fetchPlaces({ lat, lon, query: 'gas station', limit: 10, radius: 10000 });
         setStations(results);
       } catch (err: any) {
         setError(err.message || 'Failed to find nearby gas stations.');
