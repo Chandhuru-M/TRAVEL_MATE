@@ -14,15 +14,24 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow TRAVEL_MATE to use your camera to take trip photos.",
+        "NSPhotoLibraryUsageDescription": "Allow TRAVEL_MATE to access your photo library to select trip photos.",
+        "NSPhotoLibraryAddUsageDescription": "Allow TRAVEL_MATE to save photos to your library."
+      }
     },
-    "android": {
+  "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.chandhuru_m.TRAVEL_MATE"
+      "package": "com.chandhuru_m.TRAVEL_MATE",
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -31,7 +40,14 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow TRAVEL_MATE to access your photos to pick trip images.",
+          "cameraPermission": "Allow TRAVEL_MATE to use your camera to take trip photos."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
