@@ -2,11 +2,137 @@
 // @ts-nocheck
 
 import React, { useState, useMemo } from 'react';
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'react-native';
+import { supabase } from '@/lib/supabase';
+import { useTripStore } from '@/services/tripService';
+// ...existing code...
+import uuid from 'react-native-uuid';
+// --- TAB 4: PHOTOS ---
+const TripPhotosRoute = ({ trip }) => {
+  const { theme } = useTheme();
+  const [photos, setPhotos] = useState(trip.photos || []);
+  const { saveTripPhoto } = useTripStore();
+  const [uploading, setUploading] = useState(false);
+
+  // Helper to upload a single image to Supabase Storage and save URL
+  const uploadAndSavePhoto = async (uri) => {
+    try {
+      setUploading(true);
+      // Get file extension
+      const ext = uri.split('.').pop();
+      const fileName = `${uuid.v4()}.${ext}`;
+      const path = `trip-${trip.id}/${fileName}`;
+
+      // Fetch the file as blob
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      // Upload to Supabase Storage (bucket: 'trip-photos')
+      const { error: uploadError } = await supabase.storage
+        .from('trip-photos')
+        .upload(path, blob, { upsert: false });
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { publicUrl } = supabase.storage
+        .from('trip-photos')
+        .getPublicUrl(path);
+
+      // Save URL to trip in DB
+      const result = await saveTripPhoto(trip.id, publicUrl);
+      if (result.success) {
+        setPhotos(prev => [...prev, publicUrl]);
+      }
+    } catch (e) {
+      alert('Photo upload failed.');
+      console.error(e);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 1,
+    });
+    if (!result.canceled) {
+      const newPhotos = result.assets ? result.assets.map(a => a.uri) : [result.uri];
+      for (const uri of newPhotos) {
+        await uploadAndSavePhoto(uri);
+      }
+    }
+  };
+
+  const takePhoto = async () => {
+    let result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 1,
+    });
+    if (!result.canceled) {
+      const newPhotos = result.assets ? result.assets.map(a => a.uri) : [result.uri];
+      for (const uri of newPhotos) {
+        await uploadAndSavePhoto(uri);
+      }
+    }
+  };
+
+  return (
+    <View style={{ flex: 1, padding: 16 }}>
+      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+        <TouchableOpacity
+          style={[
+            styles.addButton,
+            {
+              flex: 1,
+              paddingVertical: 10,
+              paddingHorizontal: 18,
+              minHeight: 40,
+              borderRadius: 10,
+            },
+          ]}
+          onPress={pickImage}
+          disabled={uploading}
+        >
+          <Text style={[styles.addButtonText, { fontSize: 16 }]}>{uploading ? 'Uploading...' : '+ Add Photo'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.addButton,
+            {
+              flex: 1,
+              backgroundColor: '#22c55e',
+              paddingVertical: 10,
+              paddingHorizontal: 18,
+              minHeight: 40,
+              borderRadius: 10,
+            },
+          ]}
+          onPress={takePhoto}
+          disabled={uploading}
+        >
+          <Text style={[styles.addButtonText, { fontSize: 16 }]}>📷 Take Photo</Text>
+        </TouchableOpacity>
+      </View>
+      {photos.length === 0 ? (
+        <Text style={[styles.emptySceneText, { color: colors.textMuted[theme] }]}>No photos yet. Add your first trip photo!</Text>
+      ) : (
+        <ScrollView contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+          {photos.map((uri, idx) => (
+            <Image key={idx} source={{ uri }} style={{ width: 120, height: 120, borderRadius: 12, margin: 6 }} />
+          ))}
+        </ScrollView>
+      )}
+    </View>
+  );
+};
 import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator, useWindowDimensions, ScrollView, TouchableOpacity, FlatList, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
-import { useTripStore } from '@/services/tripService';
+// ...existing code...
 import { useFinanceStore } from '@/services/financeService';
 import { TabView, SceneMap, TabBar } from 'react-native-tab-view';
 import { differenceInDays } from 'date-fns';
@@ -228,12 +354,14 @@ export default function TripDetailScreen() {
     { key: 'itinerary', title: 'Itinerary' },
     { key: 'saved', title: 'Saved Places' },
     { key: 'budget', title: 'Budget' },
+    { key: 'photos', title: 'Photos' },
   ]);
 
   const renderScene = SceneMap({
     itinerary: () => <ItineraryRoute trip={trip} />,
     saved: () => <SavedPlacesRoute trip={trip} />,
     budget: () => <BudgetRoute trip={trip} />,
+    photos: () => <TripPhotosRoute trip={trip} />,
   });
 
   if (!trip) {

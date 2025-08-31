@@ -1,4 +1,4 @@
-// src/services/tripService.ts
+
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import { TripPlan, Place, ItineraryItem } from '@/lib/types';
@@ -77,6 +77,23 @@ interface TripState {
 // --- END OF FIX ---
 
 export const useTripStore = create<TripState>((set, get) => ({
+  /**
+   * Save a photo URL to the trip's photos array in Supabase
+   */
+  saveTripPhoto: async (tripId: string, photoUrl: string) => {
+    const trip = get().tripPlans.find((p: any) => p.id === tripId);
+    if (!trip) return { success: false, error: 'Trip not found.' };
+    const updatedPhotos = [...(trip.photos || []), photoUrl];
+    const { error } = await supabase.from('trip_plans').update({ photos: updatedPhotos }).eq('id', tripId);
+    if (error) {
+      console.error('Error saving trip photo:', error);
+      return { success: false, error: error.message };
+    }
+    set((state: any) => ({
+      tripPlans: state.tripPlans.map((p: any) => p.id === tripId ? { ...p, photos: updatedPhotos } : p)
+    }));
+    return { success: true };
+  },
   isLoaded: false,
   tripPlans: [],
   activeTripPlanId: null,
