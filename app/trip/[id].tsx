@@ -1,81 +1,114 @@
 // app/trip/[id].tsx
 // @ts-nocheck
 
+import 'react-native-get-random-values';
 import React, { useState, useMemo } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'react-native';
-import { supabase } from '@/lib/supabase';
 import { useTripStore } from '@/services/tripService';
+import { getLocalTripPhotos, addLocalTripPhoto, removeLocalTripPhoto } from '@/lib/localPhotos';
 // ...existing code...
-import uuid from 'react-native-uuid';
 // --- TAB 4: PHOTOS ---
 const TripPhotosRoute = ({ trip }) => {
   const { theme } = useTheme();
   const [photos, setPhotos] = useState(trip.photos || []);
-  const { saveTripPhoto } = useTripStore();
-  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
-  // Helper to upload a single image to Supabase Storage and save URL
-  const uploadAndSavePhoto = async (uri) => {
-    try {
-      setUploading(true);
-      // Get file extension
-      const ext = uri.split('.').pop();
-      const fileName = `${uuid.v4()}.${ext}`;
-      const path = `trip-${trip.id}/${fileName}`;
-
-      // Fetch the file as blob
-      const response = await fetch(uri);
-      const blob = await response.blob();
-
-      // Upload to Supabase Storage (bucket: 'trip-photos')
-      const { error: uploadError } = await supabase.storage
-        .from('trip-photos')
-        .upload(path, blob, { upsert: false });
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { publicUrl } = supabase.storage
-        .from('trip-photos')
-        .getPublicUrl(path);
-
-      // Save URL to trip in DB
-      const result = await saveTripPhoto(trip.id, publicUrl);
-      if (result.success) {
-        setPhotos(prev => [...prev, publicUrl]);
+  // Load locally stored photos for this trip id on mount
+  React.useEffect(() => {
+    (async () => {
+      const local = await getLocalTripPhotos(trip.id);
+      if (local?.length) {
+        setPhotos(prev => {
+          const merged = [...prev];
+          for (const uri of local) if (!merged.includes(uri)) merged.push(uri);
+          return merged;
+        });
       }
-    } catch (e) {
-      alert('Photo upload failed.');
-      console.error(e);
+    })();
+  }, [trip.id]);
+
+  // Save photo only to local storage
+  const saveLocalPhoto = async (uri: string) => {
+    try {
+      setSaving(true);
+      await addLocalTripPhoto(trip.id, uri);
+      setPhotos(prev => [...prev, uri]);
     } finally {
-      setUploading(false);
+      setSaving(false);
     }
   };
 
   const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      quality: 1,
-    });
-    if (!result.canceled) {
-      const newPhotos = result.assets ? result.assets.map(a => a.uri) : [result.uri];
-      for (const uri of newPhotos) {
-        await uploadAndSavePhoto(uri);
+    try {
+      console.log('pickImage pressed');
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (perm.status !== 'granted') {
+        alert('Permission to access photos is required.');
+        if (perm.canAskAgain === false) {
+          alert('Please enable Photos permission in Settings for TRAVEL_MATE.');
+        }
+        return;
       }
+      const mediaTypeEnum = (ImagePicker?.MediaType && ImagePicker.MediaType.IMAGE) || ImagePicker.MediaTypeOptions.Images;
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: mediaTypeEnum,
+        allowsMultipleSelection: true,
+        quality: 1,
+      });
+      if (!result.canceled) {
+        const newPhotos = result.assets ? result.assets.map(a => a.uri) : [result.uri];
+        for (const uri of newPhotos) {
+          await saveLocalPhoto(uri);
+        }
+      }
+    } catch (e) {
+      console.error('pickImage error:', e);
+      alert('Could not open photo library.');
     }
   };
 
   const takePhoto = async () => {
-    let result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,
-    });
-    if (!result.canceled) {
-      const newPhotos = result.assets ? result.assets.map(a => a.uri) : [result.uri];
-      for (const uri of newPhotos) {
-        await uploadAndSavePhoto(uri);
+    try {
+      console.log('takePhoto pressed');
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (perm.status !== 'granted') {
+        alert('Camera permission is required.');
+        if (perm.canAskAgain === false) {
+          alert('Please enable Camera permission in Settings for TRAVEL_MATE.');
+        }
+        return;
       }
+      const mediaTypeEnum = (ImagePicker?.MediaType && ImagePicker.MediaType.IMAGE) || ImagePicker.MediaTypeOptions.Images;
+      let result = await ImagePicker.launchCameraAsync({
+        mediaTypes: mediaTypeEnum,
+        quality: 1,
+      });
+      if (!result.canceled) {
+        const newPhotos = result.assets ? result.assets.map(a => a.uri) : [result.uri];
+        for (const uri of newPhotos) {
+      await saveLocalPhoto(uri);
+        }
+      }
+    } catch (e) {
+      console.error('takePhoto error:', e);
+      alert('Could not open camera.');
+    }
+  };
+
+  const deletePhoto = async (uri: string) => {
+    // Ask user to confirm
+    try {
+      setDeleting(uri);
+    // Local photo only
+    await removeLocalTripPhoto(trip.id, uri);
+      // Update local UI state
+      setPhotos(prev => prev.filter(p => p !== uri));
+    } catch (e) {
+      Alert.alert('Delete failed', 'Could not delete this photo.');
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -94,9 +127,9 @@ const TripPhotosRoute = ({ trip }) => {
             },
           ]}
           onPress={pickImage}
-          disabled={uploading}
+          disabled={saving}
         >
-          <Text style={[styles.addButtonText, { fontSize: 16 }]}>{uploading ? 'Uploading...' : '+ Add Photo'}</Text>
+          <Text style={[styles.addButtonText, { fontSize: 16 }]}>{saving ? 'Saving...' : '+ Add Photo'}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[
@@ -111,7 +144,7 @@ const TripPhotosRoute = ({ trip }) => {
             },
           ]}
           onPress={takePhoto}
-          disabled={uploading}
+          disabled={saving}
         >
           <Text style={[styles.addButtonText, { fontSize: 16 }]}>📷 Take Photo</Text>
         </TouchableOpacity>
@@ -121,7 +154,24 @@ const TripPhotosRoute = ({ trip }) => {
       ) : (
         <ScrollView contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap' }}>
           {photos.map((uri, idx) => (
-            <Image key={idx} source={{ uri }} style={{ width: 120, height: 120, borderRadius: 12, margin: 6 }} />
+            <View key={idx} style={{ width: 120, height: 120, margin: 6 }}>
+              <Image source={{ uri }} style={{ width: '100%', height: '100%', borderRadius: 12 }} />
+              <TouchableOpacity
+                onPress={() => deletePhoto(uri)}
+                style={{
+                  position: 'absolute',
+                  top: 6,
+                  right: 6,
+                  backgroundColor: 'rgba(0,0,0,0.6)',
+                  paddingVertical: 4,
+                  paddingHorizontal: 6,
+                  borderRadius: 8,
+                }}
+                disabled={deleting === uri}
+              >
+                <Text style={{ color: 'white', fontSize: 12 }}>{deleting === uri ? '...' : 'Delete'}</Text>
+              </TouchableOpacity>
+            </View>
           ))}
         </ScrollView>
       )}
