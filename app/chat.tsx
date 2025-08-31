@@ -341,7 +341,7 @@ export default function ChatScreen() {
   <KeyboardAwareScrollView
         style={styles.messageContainer}
         contentContainerStyle={{ padding: 16, paddingBottom: 16 + inputBarHeight + (keyboardHeight > 0 ? keyboardHeight : Math.max(12, insets.bottom)) }}
-        innerRef={endRef}
+        innerRef={(ref: any) => { endRef.current = ref; }}
         enableOnAndroid
         enableAutomaticScroll
   extraScrollHeight={Math.max(24, inputBarHeight)}

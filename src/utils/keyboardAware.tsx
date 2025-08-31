@@ -8,8 +8,8 @@ try {
   KeyboardAwareScrollView = require('react-native-keyboard-aware-scroll-view').KeyboardAwareScrollView;
 } catch (e) {
   // fallback will be native ScrollView
-  KeyboardAwareScrollView = ({ children, ...props }: any) => (
-    <ScrollView {...props}>{children}</ScrollView>
+  KeyboardAwareScrollView = ({ children, innerRef, ...props }: any) => (
+    <ScrollView ref={innerRef} {...props}>{children}</ScrollView>
   );
 }
 
