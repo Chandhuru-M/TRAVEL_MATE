@@ -90,13 +90,14 @@ currency: string;
 items: BudgetItem[];
 }
 export interface TripPlan {
-id: string;
-user_id: string;
-name: string;
-destination: string;
-dates: { start: string; end: string; };
-budget: TripBudget; // Use the new, more detailed budget type
-itinerary: ItineraryItem[];
-saved_places: Place[];
-status: 'planning' | 'active' | 'completed';
+  id: string;
+  user_id: string;
+  name: string;
+  destination: string;
+  dates: { start: string; end: string; };
+  budget: TripBudget; // Use the new, more detailed budget type
+  itinerary: ItineraryItem[];
+  saved_places: Place[];
+  status: 'planning' | 'active' | 'completed';
+  photos?: string[]; // Array of photo URLs for trip photos
 }
