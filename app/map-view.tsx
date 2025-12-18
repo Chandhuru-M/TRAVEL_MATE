@@ -7,7 +7,7 @@ import * as Location from 'expo-location'
 import useKeyboardVisible from '@/hooks/useKeyboardVisible'
 
 // Prefer env token; fallback to the token used in GroupMapView
-const MAPBOX_TOKEN = (process as any)?.env?.EXPO_PUBLIC_MAPBOX_TOKEN || 'pk.eyJ1Ijoic291bmRoYXJ5YSIsImEiOiJjbWU4MG0zZHcwNXJ5MmpxeGRxYW1sdWU4In0.R1lZA658526l1ZF2VxGG-w'
+const MAPBOX_TOKEN = (process as any)?.env?.EXPO_PUBLIC_MAPBOX_TOKEN 
 const ORS_KEY = (process as any)?.env?.EXPO_PUBLIC_OPENROUTESERVICE_API_KEY
 
 export default function MapViewScreen() {
