@@ -10,11 +10,11 @@ import {
   // Button,
   Switch,
   StyleSheet,
-  SafeAreaView,
   Alert,
   TouchableOpacity,
   ScrollView,
 } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import { WebView } from "react-native-webview";

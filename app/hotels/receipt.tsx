@@ -1,5 +1,6 @@
 import React from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, SafeAreaView, Platform, StatusBar } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, Platform, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import * as MailComposer from 'expo-mail-composer';
 import { useTheme } from '@/context/ThemeContext';

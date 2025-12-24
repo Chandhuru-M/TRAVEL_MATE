@@ -1,6 +1,7 @@
 // app/transaction-history.tsx
 import React from 'react';
-import { StyleSheet, SafeAreaView, FlatList, Text } from 'react-native';
+import { StyleSheet, FlatList, Text } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/constants/Colors';
 import { useFinanceStore } from '@/services/financeService';
