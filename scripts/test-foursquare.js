@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 
-// Load .env manually
+// Load .env manually to avoid dependencies
 const envPath = path.join(__dirname, '..', '.env');
 const env = fs.readFileSync(envPath, 'utf8');
 const lines = env.split(/\r?\n/);
