@@ -42,6 +42,12 @@
       "expo-router",
       "expo-secure-store",
       [
+        "@rnmapbox/maps",
+        {
+          "RNMapboxMapsImpl": "mapbox"
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "Allow TRAVEL_MATE to access your photos to pick trip images.",
